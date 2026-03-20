@@ -16,6 +16,7 @@ import { healthRouter } from './routes/health';
 import { socketAuthMiddleware } from './middleware/socketAuth';
 import { registerRoomHandlers } from './handlers/roomHandlers';
 import { registerGameHandlers } from './handlers/gameHandlers';
+import { setupGracefulShutdown } from './lib/timerCleanup';
 import { env } from './env';
 
 // Initialize Sentry before anything else
@@ -136,6 +137,7 @@ io.on('connection', (socket) => {
 const PORT = env.PORT;
 httpServer.listen(PORT, () => {
   console.log(`Server listening on port ${PORT}`);
+  setupGracefulShutdown();
 });
 
 export { app, io };

@@ -62,13 +62,16 @@ export function startTurnTimer(roomCode: string, timerSeconds: number, io: Serve
 // ─── Timer expiry ─────────────────────────────────────────────────────────────
 
 async function handleTimerExpiry(roomCode: string, io: Server): Promise<void> {
-  const rawState = await redis.get<string>(`game:${roomCode}`);
-  if (!rawState) return;
+  const { loadAndValidatePhase } = await import('./phaseTransition');
+  const { logger } = await import('./logger');
+  
+  const gameState = await loadAndValidatePhase(roomCode, 'clue');
+  if (!gameState) {
+    logger.warn('Clue timer fired but phase changed', { roomCode, expected: 'clue' });
+    return;
+  }
 
-  const gameState: GameState =
-    typeof rawState === 'string' ? JSON.parse(rawState) : (rawState as GameState);
-
-  if (gameState.phase !== 'clue' || !gameState.currentTurnPlayerId) return;
+  if (!gameState.currentTurnPlayerId) return;
 
   const room = await getRoom(roomCode);
   if (!room) return;

@@ -153,6 +153,7 @@ export default function CluePhaseScreen() {
     setSubmitting(true);
     if (isLocalMode && currentTurnPlayerId) {
       submitLocalClue(currentTurnPlayerId, trimmed);
+      setSubmitting(false);
       setClueInput('');
       return;
     }

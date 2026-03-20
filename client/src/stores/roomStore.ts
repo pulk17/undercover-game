@@ -271,11 +271,19 @@ export const useRoomStore = create<RoomStore>((set, get) => {
 
     async leaveRoom() {
       return new Promise<void>((resolve) => {
-        socket.once('room:left', () => {
+        const timeout = setTimeout(() => {
+          socket.off('room:left', handleLeft);
           get().reset();
           resolve();
-        });
+        }, 5000);
 
+        const handleLeft = () => {
+          clearTimeout(timeout);
+          get().reset();
+          resolve();
+        };
+
+        socket.once('room:left', handleLeft);
         socket.emit('room:leave');
       });
     },

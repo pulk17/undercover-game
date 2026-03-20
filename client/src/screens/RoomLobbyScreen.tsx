@@ -87,8 +87,12 @@ export default function RoomLobbyScreen() {
   }
 
   async function handleLeave() {
-    await leaveRoom();
-    navigate('/lobby');
+    try {
+      await leaveRoom();
+      navigate('/lobby', { replace: true });
+    } catch {
+      // Ignore leave errors and rely on local reset
+    }
   }
 
   function handleStartGame() {

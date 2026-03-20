@@ -83,6 +83,9 @@ export default function RoleRevealScreen() {
     if (!isFlipped && !hasRevealed) reveal();
   }
 
+  const handleReadyRef = useRef(handleReady);
+  handleReadyRef.current = handleReady;
+
   const lastShakeAt = useRef(0);
   useEffect(() => {
     function handleMotion(event: DeviceMotionEvent) {
@@ -97,14 +100,14 @@ export default function RoleRevealScreen() {
         const now = Date.now();
         if (now - lastShakeAt.current > 1000) {
           lastShakeAt.current = now;
-          handleReady();
+          handleReadyRef.current();
         }
       }
     }
 
     window.addEventListener('devicemotion', handleMotion);
     return () => window.removeEventListener('devicemotion', handleMotion);
-  });
+  }, []);
 
   function handleReady() {
     if (!hasRevealed || isWaiting) return;

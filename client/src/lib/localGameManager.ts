@@ -144,7 +144,8 @@ type LocalEventMap = {
   'role_assigned':    { playerId: string; role: Role; word: string | null };
   'clue_submitted':   { entry: ClueEntry };
   'turn_changed':     { playerId: string };
-  'votes_revealed':   { votes: VoteRecord[]; tally: Record<string, number> };
+  'votes_revealed':   { votes: VoteRecord[]; tally: Record<string, number>; eliminatedPlayerId: string | null; isTie: boolean };
+  'tie_broken':       { eliminatedPlayerId: string; strategy: string };
   'elimination':      { playerId: string; role?: Role };
   'winner':           { faction: WinFaction };
   'handoff_required': { playerId: string; nickname: string };
@@ -407,12 +408,56 @@ export class LocalGameManager {
     for (const v of votes) {
       tally[v.targetId] = (tally[v.targetId] ?? 0) + 1;
     }
-    this.emit('votes_revealed', { votes, tally });
+
     if (Object.keys(tally).length === 0) {
+      this.emit('votes_revealed', { votes, tally, isTie: false, eliminatedPlayerId: null });
       this.advanceRound();
       return;
     }
-    this.resolveElimination(tally);
+
+    const maxVotes = Math.max(...Object.values(tally));
+    const tied = Object.keys(tally).filter((id) => tally[id] === maxVotes);
+    const isTie = tied.length > 1;
+
+    let eliminatedId: string | null = null;
+    if (!isTie) {
+      eliminatedId = tied[0]!;
+    } else {
+      switch (this.config.tieResolution) {
+        case 'random':
+          eliminatedId = tied[Math.floor(Math.random() * tied.length)]!;
+          break;
+        case 're_vote':
+        case 'all_survive':
+          // Eliminated ID remains null
+          break;
+      }
+    }
+
+    this.emit('votes_revealed', { votes, tally, eliminatedPlayerId: eliminatedId, isTie });
+
+    if (!isTie) {
+      this.eliminatePlayer(eliminatedId!);
+      return;
+    }
+
+    // Handle Tie Consequences
+    switch (this.config.tieResolution) {
+      case 'all_survive':
+        this.advanceRound();
+        break;
+      case 'random':
+        this.emit('tie_broken', { eliminatedPlayerId: eliminatedId, strategy: 'random' });
+        this.eliminatePlayer(eliminatedId!);
+        break;
+      case 're_vote':
+        this.state = { 
+          ...this.state, 
+          votes: this.state.votes.filter((v) => v.round !== this.state.round),
+        };
+        this.emitState();
+        break;
+    }
   }
 
   private resolveElimination(tally: Record<string, number>): void {
@@ -517,7 +562,7 @@ export class LocalGameManager {
     const civilianCount   = activeRoles.filter((r) => r === 'civilian' || r === 'detective').length;
 
     // Civilian win: all undercover + mr_white eliminated, ≥2 civilians remain
-    if (undercoverCount === 0 && mrWhiteCount === 0 && civilianCount >= 2) {
+    if (undercoverCount === 0 && mrWhiteCount === 0 && civilianCount >= 1) {
       return 'civilian';
     }
 

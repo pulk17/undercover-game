@@ -12,11 +12,14 @@ export default function SplashScreen({ onDone }: { onDone: () => void }) {
   const navigate = useNavigate();
 
   useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
     // Restore session from cookie if one exists, then connect socket
     fetchMe().finally(() => {
-      const t = setTimeout(onDone, 1200);
-      return () => clearTimeout(t);
+      timer = setTimeout(onDone, 1200);
     });
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const initials = user?.nickname

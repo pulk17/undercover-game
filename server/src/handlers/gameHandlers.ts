@@ -338,15 +338,22 @@ export function registerGameHandlers(socket: Socket, io: Server): void {
       const roomCode = socket.data.roomCode as string | undefined;
       if (!roomCode) return;
 
-      // Sanitize: strip HTML tags, trim, enforce length
-      const sanitized = String(clue ?? '').replace(/<[^>]*>/g, '').trim().slice(0, 60);
-      if (!sanitized) {
-        socket.emit('room:error', { message: 'Clue cannot be empty' });
+      const { validateClue, validateActivePlayer, logValidationError } = await import('../lib/validation');
+      const { logger } = await import('../lib/logger');
+
+      // Validate and sanitize clue
+      const validation = validateClue(clue);
+      if (!validation.valid) {
+        logValidationError('clue_submit', validation.error!, { roomCode, playerId: socket.id });
+        socket.emit('room:error', { message: validation.error });
         return;
       }
 
       const rawState = await redis.get<string>(`game:${roomCode}`);
-      if (!rawState) return;
+      if (!rawState) {
+        logger.warn('Game state not found for clue submission', { roomCode });
+        return;
+      }
 
       const gameState: GameState =
         typeof rawState === 'string' ? JSON.parse(rawState) : (rawState as GameState);
@@ -361,6 +368,13 @@ export function registerGameHandlers(socket: Socket, io: Server): void {
         return;
       }
 
+      // Validate player is active
+      const activeCheck = validateActivePlayer(socket.id, gameState.activePlayers);
+      if (!activeCheck.valid) {
+        socket.emit('room:error', { message: activeCheck.error });
+        return;
+      }
+
       const room = await getRoom(roomCode);
       if (!room) return;
 
@@ -371,7 +385,7 @@ export function registerGameHandlers(socket: Socket, io: Server): void {
       const entry: ClueEntry = {
         playerId: socket.id,
         nickname,
-        clue: sanitized,
+        clue: validation.sanitized,
         round: gameState.round,
         timestamp: Date.now(),
       };

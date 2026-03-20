@@ -158,7 +158,7 @@ export default function VotingScreen() {
     setEliminatedPlayerId(null);
     setIsTie(false);
     setRevealed(false);
-  }, [currentLocalVoterId, currentRound, gameState?.phase, isLocalMode]);
+  }, [currentRound, gameState?.phase, isLocalMode]);
 
   function handleVote(targetId: string) {
     if (submittedVoteId !== null || targetId === myId || !myId) return;
