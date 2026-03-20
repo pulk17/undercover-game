@@ -7,6 +7,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "test": "vitest run",
+    "migrate": "ts-node -r dotenv/config src/db/migrate.ts",
     "seed": "ts-node src/db/seed.ts"
   },
   "dependencies": {
