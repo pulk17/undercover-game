@@ -121,8 +121,8 @@ authRouter.post('/google', async (req: Request, res: Response) => {
 
   res.cookie('session', token, {
     httpOnly: true,
-    secure: env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    secure: true,
+    sameSite: 'none',
     maxAge: THIRTY_DAYS_MS,
     path: '/',
   });
@@ -157,8 +157,8 @@ authRouter.post('/guest', (_req: Request, res: Response) => {
 
   res.cookie('session', token, {
     httpOnly: true,
-    secure: env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    secure: true,
+    sameSite: 'none',
     maxAge: THIRTY_DAYS_MS,
     path: '/',
   });
