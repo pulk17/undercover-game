@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { signInWithPopup, signInWithCredential, GoogleAuthProvider } from 'firebase/auth';
 import { auth, googleProvider } from '../lib/firebase';
 import { useAuthStore } from '../stores/authStore';
@@ -25,6 +25,9 @@ declare global {
 
 const GOOGLE_CLIENT_ID = env.VITE_GOOGLE_CLIENT_ID || (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined);
 
+// Module-level guard — survives StrictMode double-invoke
+let gisInitialized = false;
+
 function loadGisScript(): Promise<void> {
   return new Promise((resolve, reject) => {
     if (document.getElementById('google-gis-script')) {
@@ -44,20 +47,20 @@ function loadGisScript(): Promise<void> {
 
 export default function GoogleSignInButton() {
   const { login, isLoading, error } = useAuthStore();
-  const oneTapInitialized = useRef(false);
 
   useEffect(() => {
-    if (!GOOGLE_CLIENT_ID || oneTapInitialized.current) return;
+    if (!GOOGLE_CLIENT_ID || gisInitialized) return;
 
     loadGisScript()
       .then(() => {
-        if (!window.google?.accounts?.id) return;
-        oneTapInitialized.current = true;
+        if (!window.google?.accounts?.id || gisInitialized) return;
+        gisInitialized = true;
         window.google.accounts.id.initialize({
           client_id: GOOGLE_CLIENT_ID,
           callback: async ({ credential }) => {
             try {
-              const firebaseCredential = GoogleAuthProvider.credential(null, credential);
+              // credential from One Tap is a JWT id_token
+              const firebaseCredential = GoogleAuthProvider.credential(credential);
               const result = await signInWithCredential(auth, firebaseCredential);
               const idToken = await result.user.getIdToken();
               await login(idToken);

@@ -97,10 +97,8 @@ async function handleTimerExpiry(roomCode: string, io: Server): Promise<void> {
 
         // Check if all remaining players have submitted
         if (allCluesSubmitted(gameState)) {
-          gameState.phase = 'discussion';
-          await redis.set(`game:${roomCode}`, JSON.stringify(gameState), { ex: GAME_TTL });
-          const publicState = toPublicGameState(gameState);
-          io.to(roomCode).emit('game:phase_changed', { phase: 'discussion', state: publicState });
+          const { startDiscussionPhase } = await import('./discussionManager');
+          await startDiscussionPhase(io, roomCode, gameState);
           return;
         }
 
@@ -142,10 +140,8 @@ export async function advanceTurn(
 
   // Check if all clues submitted for this round
   if (allCluesSubmitted(gameState)) {
-    gameState.phase = 'discussion';
-    await redis.set(`game:${roomCode}`, JSON.stringify(gameState), { ex: GAME_TTL });
-    const publicState: PublicGameState = toPublicGameState(gameState);
-    io.to(roomCode).emit('game:phase_changed', { phase: 'discussion', state: publicState });
+    const { startDiscussionPhase } = await import('./discussionManager');
+    await startDiscussionPhase(io, roomCode, gameState);
     return;
   }
 
@@ -169,10 +165,8 @@ export async function advanceTurn(
 
   if (!nextPlayerId) {
     // Fallback: all submitted (shouldn't reach here, but be safe)
-    gameState.phase = 'discussion';
-    await redis.set(`game:${roomCode}`, JSON.stringify(gameState), { ex: GAME_TTL });
-    const publicState = toPublicGameState(gameState);
-    io.to(roomCode).emit('game:phase_changed', { phase: 'discussion', state: publicState });
+    const { startDiscussionPhase } = await import('./discussionManager');
+    await startDiscussionPhase(io, roomCode, gameState);
     return;
   }
 

@@ -364,10 +364,8 @@ export function registerGameHandlers(socket: Socket, io: Server): void {
 
       // Check if all clues submitted → phase transition
       if (allCluesSubmitted(gameState)) {
-        gameState.phase = 'discussion';
-        await redis.set(`game:${roomCode}`, JSON.stringify(gameState), { ex: GAME_TTL });
-        const publicState: PublicGameState = toPublicGameState(gameState);
-        io.to(roomCode).emit('game:phase_changed', { phase: 'discussion', state: publicState });
+        const { startDiscussionPhase } = await import('../lib/discussionManager');
+        await startDiscussionPhase(io, roomCode, gameState);
         return;
       }
 
@@ -511,24 +509,81 @@ export function registerGameHandlers(socket: Socket, io: Server): void {
       const gameState: GameState =
         typeof rawState === 'string' ? JSON.parse(rawState) : (rawState as GameState);
 
-      // Only valid in discussion phase with no active timer (unlimited mode)
-      if (gameState.phase !== 'discussion' || gameState.phaseEndsAt !== null) {
-        socket.emit('room:error', { message: 'Cannot end discussion: only allowed in unlimited discussion mode' });
+      if (gameState.phase !== 'discussion') {
+        socket.emit('room:error', { message: 'Not in discussion phase' });
         return;
       }
+
+      // Cancel any running discussion timer
+      cancelDiscussionTimer(roomCode);
 
       // Transition to vote phase
       gameState.phase = 'vote';
       gameState.phaseEndsAt = null;
 
-      // Persist updated state
       await redis.set(`game:${roomCode}`, JSON.stringify(gameState), { ex: GAME_TTL });
 
-      // Broadcast phase change
       const publicState = toPublicGameState(gameState);
       io.to(roomCode).emit('game:phase_changed', { phase: 'vote', state: publicState });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to end discussion';
+      socket.emit('room:error', { message });
+    }
+  });
+
+  // game:request_early_vote — any active player can request to skip to voting
+  // If majority of active players request it, discussion ends immediately
+  socket.on('game:request_early_vote', async () => {
+    try {
+      const roomCode = socket.data.roomCode as string | undefined;
+      if (!roomCode) return;
+
+      const rawState = await redis.get<string>(`game:${roomCode}`);
+      if (!rawState) return;
+
+      const gameState: GameState =
+        typeof rawState === 'string' ? JSON.parse(rawState) : (rawState as GameState);
+
+      if (gameState.phase !== 'discussion') {
+        socket.emit('room:error', { message: 'Not in discussion phase' });
+        return;
+      }
+
+      if (!gameState.activePlayers.includes(socket.id)) {
+        socket.emit('room:error', { message: 'You are not an active player' });
+        return;
+      }
+
+      // Track early vote requests in Redis
+      const earlyVoteKey = `early_vote:${roomCode}:${gameState.round}`;
+      await redis.sadd(earlyVoteKey, socket.id);
+      await redis.expire(earlyVoteKey, 300); // 5 min TTL
+
+      const requestCount = await redis.scard(earlyVoteKey);
+      const majority = Math.ceil(gameState.activePlayers.length / 2);
+
+      // Broadcast current request count so clients can show progress
+      io.to(roomCode).emit('game:early_vote_update', {
+        requestCount,
+        required: majority,
+        requestedBy: socket.id,
+      });
+
+      if (requestCount >= majority) {
+        // Majority reached — cancel timer and go to vote
+        cancelDiscussionTimer(roomCode);
+        await redis.del(earlyVoteKey);
+
+        gameState.phase = 'vote';
+        gameState.phaseEndsAt = null;
+
+        await redis.set(`game:${roomCode}`, JSON.stringify(gameState), { ex: GAME_TTL });
+
+        const publicState = toPublicGameState(gameState);
+        io.to(roomCode).emit('game:phase_changed', { phase: 'vote', state: publicState });
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to request early vote';
       socket.emit('room:error', { message });
     }
   });

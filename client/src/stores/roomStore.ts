@@ -6,7 +6,20 @@ import type { Room, Player, GameConfig } from '../../../shared/types';
 // Derive socket URL: use VITE_SOCKET_URL if set, otherwise same origin
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL ?? '';
 
-export const socket = io(SOCKET_URL, { withCredentials: true });
+export const socket = io(SOCKET_URL, {
+  withCredentials: true,
+  autoConnect: false,
+  transports: ['websocket'],   // skip polling — no HTTP probe, no proxy noise
+  reconnectionDelay: 1000,
+  reconnectionDelayMax: 10000,
+  reconnectionAttempts: 10,
+  timeout: 10000,
+});
+
+/** Call after a session cookie is established (login / guest auth) */
+export function connectSocket() {
+  if (!socket.connected) socket.connect();
+}
 
 // ─── State & Actions ──────────────────────────────────────────────────────────
 

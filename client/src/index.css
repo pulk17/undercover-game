@@ -213,31 +213,88 @@
   }
 }
 
-/* ── High contrast overrides ──────────────────────────────────────────────── */
-.high-contrast body {
-  background: #000;
-  color: #fff;
-  --bg: #000;
-  --surface: #111;
+/* ── Text scale overrides ─────────────────────────────────────────────────── */
+/* Applied via data-text-scale attribute on <html> */
+html[data-text-scale="small"]  { font-size: 14px; }
+html[data-text-scale="medium"] { font-size: 16px; }
+html[data-text-scale="large"]  { font-size: 18px; }
+
+/* Scale inline-styled text proportionally */
+html[data-text-scale="small"]  [style*="fontSize: 14"] { font-size: 12px !important; }
+html[data-text-scale="small"]  [style*="fontSize: 15"] { font-size: 13px !important; }
+html[data-text-scale="small"]  [style*="fontSize: 28"] { font-size: 24px !important; }
+html[data-text-scale="small"]  [style*="fontSize: 22"] { font-size: 18px !important; }
+
+html[data-text-scale="large"]  [style*="fontSize: 14"] { font-size: 16px !important; }
+html[data-text-scale="large"]  [style*="fontSize: 15"] { font-size: 17px !important; }
+html[data-text-scale="large"]  [style*="fontSize: 28"] { font-size: 32px !important; }
+html[data-text-scale="large"]  [style*="fontSize: 22"] { font-size: 26px !important; }
+
+
+html.high-contrast {
+  --bg: #000000;
+  --surface: #111111;
   --surface-low: #1a1a1a;
-  --surface-high: #333;
-  --border: rgba(255, 255, 255, 0.4);
+  --surface-high: #333333;
+  --border: rgba(255, 255, 255, 0.5);
   --text: #ffffff;
   --muted: #cccccc;
   --muted2: #dddddd;
+  --amber: #ffe000;
+  --amber-light: #ffee55;
+  --teal: #00ffcc;
+  --red: #ff4444;
 }
 
-.high-contrast input {
+html.high-contrast body,
+html.high-contrast #root {
+  background: #000 !important;
+  color: #fff !important;
+}
+
+/* Force inline-styled backgrounds to use CSS vars */
+html.high-contrast [style*="background: #08090d"],
+html.high-contrast [style*="background: rgb(8, 9, 13)"] {
+  background: #000 !important;
+}
+html.high-contrast [style*="background: #12141c"],
+html.high-contrast [style*="background: rgb(18, 20, 28)"] {
+  background: #111 !important;
+}
+html.high-contrast [style*="color: #8c8a85"],
+html.high-contrast [style*="color: rgb(140, 138, 133)"] {
+  color: #ccc !important;
+}
+html.high-contrast [style*="color: #4a5068"],
+html.high-contrast [style*="color: rgb(74, 80, 104)"] {
+  color: #aaa !important;
+}
+html.high-contrast [style*="color: #e3e2e8"],
+html.high-contrast [style*="color: rgb(227, 226, 232)"] {
+  color: #fff !important;
+}
+
+html.high-contrast input,
+html.high-contrast textarea {
   border-width: 2px !important;
   border-color: #fff !important;
+  background: #111 !important;
+  color: #fff !important;
 }
 
-.high-contrast .btn-primary,
-.high-contrast .btn-secondary,
-.high-contrast .btn-danger {
+html.high-contrast .btn-primary {
+  background: #ffe000 !important;
+  color: #000 !important;
   border: 2px solid #fff !important;
 }
-.high-contrast .card {
-  background: #111;
-  border: 2px solid var(--border);
+html.high-contrast .btn-secondary {
+  border: 2px solid #fff !important;
+  color: #fff !important;
+}
+html.high-contrast .btn-danger {
+  border: 2px solid #fff !important;
+}
+html.high-contrast .card {
+  background: #111 !important;
+  border: 2px solid rgba(255,255,255,0.5) !important;
 }

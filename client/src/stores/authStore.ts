@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { AuthUser } from '../../../shared/types';
 import { env } from '../env';
 import { flushOfflineQueue } from '../lib/offlineQueue';
+import { connectSocket } from './roomStore';
 
 interface AuthState {
   user: AuthUser | null;
@@ -48,7 +49,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
         body: JSON.stringify({ idToken }),
       });
       set({ user, isLoading: false });
-      // Flush any XP/stats earned during offline local games
+      connectSocket();
       void flushOfflineQueue();
     } catch (err) {
       set({ error: (err as Error).message, isLoading: false });
@@ -60,6 +61,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
     try {
       const user = await apiFetch<AuthUser>('/auth/guest', { method: 'POST' });
       set({ user, isLoading: false });
+      connectSocket();
       void flushOfflineQueue();
     } catch (err) {
       set({ error: (err as Error).message, isLoading: false });
@@ -81,6 +83,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
     try {
       const user = await apiFetch<AuthUser>('/auth/me');
       set({ user, isLoading: false });
+      connectSocket();
       // Flush any queued offline XP/stats now that we have a session
       void flushOfflineQueue();
     } catch (err) {

@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useRoomStore } from '../stores/roomStore';
-import type { GameConfig, GameMode, Difficulty, TieResolution } from '../../../shared/types';
+import { env } from '../env';
+import type { GameConfig, GameMode, Difficulty } from '../../../shared/types';
 
 const defaultConfig: GameConfig = {
   mode: 'classic',
@@ -20,10 +21,7 @@ const defaultConfig: GameConfig = {
 
 async function hashPassword(password: string): Promise<string | null> {
   if (!password) return null;
-  if (!crypto.subtle) {
-    console.warn('crypto.subtle not available. Passwords require a secure context (HTTPS/localhost). Proceeding without password hash for local dev.');
-    return null;
-  }
+  if (!crypto.subtle) return null;
   const encoder = new TextEncoder();
   const data = encoder.encode(password);
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
@@ -31,19 +29,32 @@ async function hashPassword(password: string): Promise<string | null> {
   return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-const MODES: { value: GameMode; label: string; icon: string }[] = [
-  { value: 'classic', label: 'CLASSIC', icon: '◎' },
-  { value: 'speed_round', label: 'SPEED', icon: '⚡' },
-  { value: 'double_agent', label: 'DOUBLE', icon: '◈' },
-  { value: 'reverse_mode', label: 'REVERSE', icon: '↺' },
+const MODES: { value: GameMode; label: string; icon: string; desc: string }[] = [
+  { value: 'classic', label: 'CLASSIC', icon: '◎', desc: 'Standard rules' },
+  { value: 'speed_round', label: 'SPEED', icon: '⚡', desc: 'Short timers' },
+  { value: 'double_agent', label: 'DOUBLE', icon: '◈', desc: '2 undercovers' },
+  { value: 'reverse_mode', label: 'REVERSE', icon: '↺', desc: 'Undercover knows' },
 ];
 
-const CATEGORIES = ['general', 'food', 'travel', 'cinema', 'sports', 'tech'];
+const FALLBACK_CATEGORIES = ['general', 'food', 'travel', 'cinema', 'sports', 'tech'];
 
-const DIFFICULTIES: { value: Difficulty; color: string }[] = [
-  { value: 'easy', color: '#3ecfb0' },
-  { value: 'medium', color: '#e8c547' },
-  { value: 'hard', color: '#e84b4b' },
+const CATEGORY_ICONS: Record<string, string> = {
+  general: '🌐',
+  food: '🍕',
+  travel: '✈️',
+  cinema: '🎬',
+  sports: '⚽',
+  tech: '💻',
+  nature: '🌿',
+  music: '🎵',
+  history: '📜',
+  science: '🔬',
+};
+
+const DIFFICULTIES: { value: Difficulty; color: string; label: string }[] = [
+  { value: 'easy', color: '#3ecfb0', label: 'EASY' },
+  { value: 'medium', color: '#e8c547', label: 'MEDIUM' },
+  { value: 'hard', color: '#e84b4b', label: 'HARD' },
 ];
 
 const TIMER_OPTIONS = [30, 60, 90];
@@ -69,6 +80,8 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
       className={checked ? 'toggle-on' : 'toggle-off'}
       onClick={() => onChange(!checked)}
       style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+      role="switch"
+      aria-checked={checked}
     >
       <div className="toggle-track">
         <div className="toggle-thumb" />
@@ -79,13 +92,33 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
 
 export default function CreateRoomScreen() {
   const navigate = useNavigate();
-  const { createRoom, error } = useRoomStore();
+  const { createRoom, error, isConnected } = useRoomStore();
 
   const [config, setConfig] = useState<GameConfig>(defaultConfig);
   const [password, setPassword] = useState('');
   const [clueUnlimited, setClueUnlimited] = useState(false);
   const [discussionUnlimited, setDiscussionUnlimited] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [categories, setCategories] = useState<string[]>(FALLBACK_CATEGORIES);
+
+  // Fetch categories from the server
+  useEffect(() => {
+    fetch(`${env.VITE_API_BASE_URL}/words/categories`, { credentials: 'include' })
+      .then((r) => r.json())
+      .then((body) => {
+        if (body.data && Array.isArray(body.data) && body.data.length > 0) {
+          setCategories(body.data);
+          // Reset selected categories to first available if current selection is invalid
+          setConfig((prev) => ({
+            ...prev,
+            categories: prev.categories.filter((c) => body.data.includes(c)).length > 0
+              ? prev.categories.filter((c) => body.data.includes(c))
+              : [body.data[0]],
+          }));
+        }
+      })
+      .catch(() => {/* keep fallback */});
+  }, []);
 
   function setField<K extends keyof GameConfig>(key: K, value: GameConfig[K]) {
     setConfig((prev) => ({ ...prev, [key]: value }));
@@ -93,6 +126,10 @@ export default function CreateRoomScreen() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!isConnected) {
+      alert('Not connected to server. Please check your connection and try again.');
+      return;
+    }
     setSubmitting(true);
     try {
       const finalConfig: GameConfig = {
@@ -100,32 +137,21 @@ export default function CreateRoomScreen() {
         clueTimerSeconds: clueUnlimited ? null : config.clueTimerSeconds,
         discussionTimerSeconds: discussionUnlimited ? null : config.discussionTimerSeconds,
       };
-      // hashPassword now gracefully returns null if crypto.subtle is unsupported (e.g. local IP testing over HTTP)
       const passwordHash = password ? await hashPassword(password) : null;
       await createRoom(finalConfig, passwordHash);
       navigate('/lobby');
-    } catch (err: any) {
-      alert(err.message || 'Failed to create room');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to create room';
+      alert(msg);
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: '#08090d',
-      color: '#e3e2e8',
-      paddingBottom: 100,
-    }}>
+    <div style={{ minHeight: '100vh', background: '#08090d', color: '#e3e2e8', paddingBottom: 100 }}>
       {/* Header */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'flex-start',
-        justifyContent: 'space-between',
-        padding: '24px 20px 0',
-        marginBottom: 8,
-      }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '24px 20px 0', marginBottom: 8 }}>
         <div>
           <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, color: '#4a5068', letterSpacing: '0.15em', margin: '0 0 4px' }}>
             SEC-R812-B
@@ -142,6 +168,15 @@ export default function CreateRoomScreen() {
           ✕
         </button>
       </div>
+
+      {/* Connection warning */}
+      {!isConnected && (
+        <div style={{ margin: '8px 20px', padding: '10px 14px', background: 'rgba(232,75,75,0.1)', border: '1px solid rgba(232,75,75,0.3)', borderRadius: 10 }}>
+          <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 11, color: '#e84b4b', margin: 0, letterSpacing: '0.05em' }}>
+            ⚠ NOT CONNECTED — Reconnecting to server…
+          </p>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 28 }}>
 
@@ -161,7 +196,7 @@ export default function CreateRoomScreen() {
                   onClick={() => setField('mode', m.value)}
                   style={{
                     minWidth: 80,
-                    height: 72,
+                    height: 80,
                     background: active ? 'rgba(232,197,71,0.08)' : '#12141c',
                     border: `1px solid ${active ? '#e8c547' : 'rgba(255,255,255,0.07)'}`,
                     borderRadius: 12,
@@ -169,16 +204,19 @@ export default function CreateRoomScreen() {
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: 6,
+                    gap: 4,
                     cursor: 'pointer',
                     transition: 'all 150ms ease',
-                    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
                     flexShrink: 0,
+                    padding: '8px 6px',
                   }}
                 >
                   <span style={{ fontSize: 18, color: active ? '#e8c547' : '#8c8a85' }}>{m.icon}</span>
                   <span style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 9, letterSpacing: '0.1em', color: active ? '#e8c547' : '#8c8a85' }}>
                     {m.label}
+                  </span>
+                  <span style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 8, color: active ? 'rgba(232,197,71,0.6)' : '#4a5068', textAlign: 'center' }}>
+                    {m.desc}
                   </span>
                 </button>
               );
@@ -188,18 +226,24 @@ export default function CreateRoomScreen() {
 
         {/* Word Category */}
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-          <SectionLabel>WORD CATEGORY</SectionLabel>
-          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
-            {CATEGORIES.map((cat) => {
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <SectionLabel>WORD CATEGORY</SectionLabel>
+            <span style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, color: '#3ecfb0', letterSpacing: '0.1em' }}>
+              {config.categories.length} SELECTED
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {categories.map((cat) => {
               const active = config.categories.includes(cat);
+              const icon = CATEGORY_ICONS[cat] ?? '🎯';
               return (
                 <button
                   key={cat}
                   type="button"
                   onClick={() => {
                     const isLast = config.categories.length === 1;
-                    if (active && isLast) return; // prevent zero categories
-                    const next = active 
+                    if (active && isLast) return;
+                    const next = active
                       ? config.categories.filter((c) => c !== cat)
                       : [...config.categories, cat];
                     setField('categories', next);
@@ -214,13 +258,13 @@ export default function CreateRoomScreen() {
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: 6,
+                    gap: 4,
                     cursor: 'pointer',
                     transition: 'all 150ms ease',
-                    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
                     flexShrink: 0,
                   }}
                 >
+                  <span style={{ fontSize: 16 }}>{icon}</span>
                   <span style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 9, letterSpacing: '0.1em', color: active ? '#3ecfb0' : '#8c8a85', textTransform: 'uppercase' }}>
                     {cat}
                   </span>
@@ -232,15 +276,8 @@ export default function CreateRoomScreen() {
 
         {/* Difficulty */}
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
-          <SectionLabel>DIFFICULTY_THREAT_LEVEL</SectionLabel>
-          <div style={{
-            display: 'flex',
-            background: '#12141c',
-            border: '1px solid rgba(255,255,255,0.07)',
-            borderRadius: 12,
-            padding: 4,
-            gap: 4,
-          }}>
+          <SectionLabel>DIFFICULTY</SectionLabel>
+          <div style={{ display: 'flex', background: '#12141c', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: 4, gap: 4 }}>
             {DIFFICULTIES.map((d) => {
               const active = config.difficulty === d.value;
               return (
@@ -264,29 +301,23 @@ export default function CreateRoomScreen() {
                     transition: 'all 150ms ease',
                   }}
                 >
-                  {d.value}
+                  {d.label}
                 </button>
               );
             })}
           </div>
         </motion.div>
 
-        {/* Directives (options rows) */}
+        {/* Directives */}
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
           <SectionLabel>DIRECTIVES</SectionLabel>
-          <div style={{
-            background: '#12141c',
-            border: '1px solid rgba(255,255,255,0.07)',
-            borderRadius: 14,
-            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
-            overflow: 'hidden',
-          }}>
+          <div style={{ background: '#12141c', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, overflow: 'hidden' }}>
             {/* Clue Timer */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', height: 52, borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-              <span style={{ fontFamily: 'Syne, sans-serif', fontSize: 14, color: '#e3e2e8' }}>Time Limit per Turn</span>
-              <div style={{ display: 'flex', gap: 6 }}>
+              <span style={{ fontFamily: 'Syne, sans-serif', fontSize: 14, color: '#e3e2e8' }}>Clue Timer</span>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                 {clueUnlimited ? (
-                  <button type="button" onClick={() => setClueUnlimited(false)} style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, color: '#3ecfb0', background: 'rgba(62,207,176,0.1)', border: '1px solid rgba(62,207,176,0.3)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer' }}>∞</button>
+                  <span style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, color: '#3ecfb0' }}>∞ Unlimited</span>
                 ) : (
                   TIMER_OPTIONS.map((t) => (
                     <button
@@ -309,8 +340,42 @@ export default function CreateRoomScreen() {
                     </button>
                   ))
                 )}
-                <button type="button" onClick={() => setClueUnlimited(v => !v)} style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, color: '#4a5068', background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px 4px' }}>
+                <button type="button" onClick={() => setClueUnlimited(v => !v)} style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, color: '#4a5068', background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px' }}>
                   {clueUnlimited ? '⏱' : '∞'}
+                </button>
+              </div>
+            </div>
+
+            {/* Discussion Timer */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', height: 52, borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+              <span style={{ fontFamily: 'Syne, sans-serif', fontSize: 14, color: '#e3e2e8' }}>Discussion Timer</span>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                {discussionUnlimited ? (
+                  <span style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, color: '#3ecfb0' }}>∞ Unlimited</span>
+                ) : (
+                  [60, 120, 180].map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setField('discussionTimerSeconds', t)}
+                      style={{
+                        fontFamily: 'IBM Plex Mono, monospace',
+                        fontSize: 10,
+                        color: config.discussionTimerSeconds === t ? '#000' : '#8c8a85',
+                        background: config.discussionTimerSeconds === t ? '#e8c547' : 'transparent',
+                        border: `1px solid ${config.discussionTimerSeconds === t ? '#e8c547' : 'rgba(255,255,255,0.1)'}`,
+                        borderRadius: 6,
+                        padding: '4px 8px',
+                        cursor: 'pointer',
+                        transition: 'all 150ms ease',
+                      }}
+                    >
+                      {t}s
+                    </button>
+                  ))
+                )}
+                <button type="button" onClick={() => setDiscussionUnlimited(v => !v)} style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, color: '#4a5068', background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px' }}>
+                  {discussionUnlimited ? '⏱' : '∞'}
                 </button>
               </div>
             </div>
@@ -337,14 +402,14 @@ export default function CreateRoomScreen() {
 
         {/* Capacity + Password */}
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} style={{ display: 'flex', gap: 12 }}>
-          <div style={{ flex: 1, background: '#12141c', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: '14px 16px', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)' }}>
+          <div style={{ flex: 1, background: '#12141c', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: '14px 16px' }}>
             <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 9, letterSpacing: '0.15em', color: '#4a5068', textTransform: 'uppercase', margin: '0 0 6px' }}>CAPACITY</p>
             <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 22, color: '#e3e2e8', margin: '0 0 2px' }}>
               3 – {config.maxPlayers}
             </p>
             <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, color: '#8c8a85', margin: 0 }}>PLAYERS</p>
           </div>
-          <div style={{ flex: 1, background: '#12141c', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: '14px 16px', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)' }}>
+          <div style={{ flex: 1, background: '#12141c', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: '14px 16px' }}>
             <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 9, letterSpacing: '0.15em', color: '#4a5068', textTransform: 'uppercase', margin: '0 0 6px' }}>MAX PLAYERS</p>
             <input
               type="number"
@@ -352,17 +417,7 @@ export default function CreateRoomScreen() {
               max={12}
               value={config.maxPlayers}
               onChange={(e) => setField('maxPlayers', Math.min(12, Math.max(3, Number(e.target.value))))}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                fontFamily: 'Syne, sans-serif',
-                fontWeight: 700,
-                fontSize: 22,
-                color: '#e8c547',
-                width: '100%',
-                outline: 'none',
-                padding: 0,
-              }}
+              style={{ background: 'transparent', border: 'none', fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 22, color: '#e8c547', width: '100%', outline: 'none', padding: 0 }}
             />
           </div>
         </motion.div>
@@ -387,7 +442,6 @@ export default function CreateRoomScreen() {
               color: '#e3e2e8',
               outline: 'none',
               boxSizing: 'border-box',
-              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
             }}
             onFocus={(e) => { e.currentTarget.style.borderColor = '#e8c547'; }}
             onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'; }}
@@ -395,11 +449,16 @@ export default function CreateRoomScreen() {
         </motion.div>
 
         {error && (
-          <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 12, color: '#e84b4b' }}>{error}</p>
+          <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 12, color: '#e84b4b', margin: 0 }}>{error}</p>
         )}
 
-        <button type="submit" disabled={submitting} className="btn-primary" style={{ height: 56, fontSize: 15 }}>
-          {submitting ? 'CREATING…' : 'START LOBBY →'}
+        <button
+          type="submit"
+          disabled={submitting || !isConnected}
+          className="btn-primary"
+          style={{ height: 56, fontSize: 15 }}
+        >
+          {submitting ? 'CREATING…' : !isConnected ? 'CONNECTING…' : 'START LOBBY →'}
         </button>
       </form>
     </div>

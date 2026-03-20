@@ -25,9 +25,20 @@ if (env.SENTRY_DSN) {
 
 const app = express();
 const httpServer = createServer(app);
+
+// Trust the first proxy hop (Vite dev proxy / ngrok / render.com)
+// Required for express-rate-limit to correctly identify client IPs
+app.set('trust proxy', 1);
+
+// Parse allowed origins — supports comma-separated list in CLIENT_ORIGIN
+const allowedOrigins = env.CLIENT_ORIGIN.split(',').map((o) => o.trim()).filter(Boolean);
+
 const io = new Server(httpServer, {
   cors: {
-    origin: env.CLIENT_ORIGIN,
+    origin: (origin, cb) => {
+      if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+      cb(new Error(`CORS: origin ${origin} not allowed`));
+    },
     credentials: true,
   },
 });
@@ -64,8 +75,14 @@ io.use((socket, next) => {
 // Middleware
 // 19.1: Helmet applied early in the chain
 app.use(helmet());
-// 19.2: CORS restricted to configured frontend origin
-app.use(cors({ origin: env.CLIENT_ORIGIN, credentials: true }));
+// 19.2: CORS restricted to configured frontend origins (comma-separated)
+app.use(cors({
+  origin: (origin, cb) => {
+    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+    cb(new Error(`CORS: origin ${origin} not allowed`));
+  },
+  credentials: true,
+}));
 app.use(cookieParser());
 app.use(express.json());
 

@@ -8,14 +8,16 @@ import GoogleSignInButton from '../components/GoogleSignInButton';
 // It shows the UNDERCOVER logo, CTA buttons, and a player footer.
 
 export default function SplashScreen({ onDone }: { onDone: () => void }) {
-  const { user } = useAuthStore();
+  const { user, fetchMe } = useAuthStore();
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Brief splash then hand off to App routing
-    const t = setTimeout(onDone, 1800);
-    return () => clearTimeout(t);
-  }, [onDone]);
+    // Restore session from cookie if one exists, then connect socket
+    fetchMe().finally(() => {
+      const t = setTimeout(onDone, 1200);
+      return () => clearTimeout(t);
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const initials = user?.nickname
     ? user.nickname.slice(0, 2).toUpperCase()

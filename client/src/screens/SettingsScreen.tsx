@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuthStore } from '../stores/authStore';
+import GoogleSignInButton from '../components/GoogleSignInButton';
 
 type TextScale = 'small' | 'medium' | 'large';
-const SCALE_MAP: Record<TextScale, string> = { small: '14px', medium: '16px', large: '18px' };
 
 function SettingsRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -12,8 +12,8 @@ function SettingsRow({ label, children }: { label: string; children: React.React
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
-      height: 52,
-      padding: '0 16px',
+      minHeight: 52,
+      padding: '8px 16px',
       borderBottom: '1px solid rgba(255,255,255,0.04)',
     }}>
       <span style={{ fontFamily: 'Syne, sans-serif', fontSize: 14, color: '#e3e2e8' }}>{label}</span>
@@ -30,6 +30,8 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
       style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}
       role="switch"
       aria-checked={checked}
+      tabIndex={0}
+      onKeyDown={(e) => e.key === 'Enter' && onChange(!checked)}
     >
       <div className="toggle-track">
         <div className="toggle-thumb" />
@@ -51,7 +53,7 @@ export default function SettingsScreen() {
   }, [highContrast]);
 
   useEffect(() => {
-    document.documentElement.style.fontSize = SCALE_MAP[textScale];
+    document.documentElement.setAttribute('data-text-scale', textScale);
     localStorage.setItem('textScale', textScale);
   }, [textScale]);
 
@@ -117,18 +119,55 @@ export default function SettingsScreen() {
         </div>
 
         {/* Account */}
+        <div>
+          <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, color: '#4a5068', letterSpacing: '0.15em', textTransform: 'uppercase', margin: '0 0 8px' }}>
+            ACCOUNT
+          </p>
+          <div style={{ background: '#12141c', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, overflow: 'hidden', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)' }}>
+            {user ? (
+              <>
+                <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                  <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, color: '#4a5068', margin: '0 0 2px', letterSpacing: '0.1em' }}>SIGNED IN AS</p>
+                  <p style={{ fontFamily: 'Syne, sans-serif', fontSize: 14, color: '#e3e2e8', margin: 0 }}>{user.nickname || user.displayName}</p>
+                </div>
+                <button
+                  onClick={() => logout()}
+                  style={{
+                    width: '100%',
+                    height: 52,
+                    background: 'transparent',
+                    border: 'none',
+                    fontFamily: 'IBM Plex Mono, monospace',
+                    fontSize: 12,
+                    color: '#8c8a85',
+                    cursor: 'pointer',
+                    letterSpacing: '0.1em',
+                    textAlign: 'left',
+                    padding: '0 16px',
+                  }}
+                >
+                  SIGN OUT
+                </button>
+              </>
+            ) : (
+              <div style={{ padding: 16 }}>
+                <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, color: '#4a5068', margin: '0 0 12px', letterSpacing: '0.1em' }}>
+                  SIGN IN TO SAVE PROGRESS
+                </p>
+                <GoogleSignInButton />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Danger zone — only shown when signed in */}
         {user && (
           <div>
             <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, color: '#4a5068', letterSpacing: '0.15em', textTransform: 'uppercase', margin: '0 0 8px' }}>
-              ACCOUNT
+              DANGER ZONE
             </p>
             <div style={{ background: '#12141c', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, overflow: 'hidden', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)' }}>
-              <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, color: '#4a5068', margin: '0 0 2px', letterSpacing: '0.1em' }}>SIGNED IN AS</p>
-                <p style={{ fontFamily: 'Syne, sans-serif', fontSize: 14, color: '#e3e2e8', margin: 0 }}>{user.nickname || user.displayName}</p>
-              </div>
               <button
-                onClick={() => logout()}
                 style={{
                   width: '100%',
                   height: 52,
@@ -136,45 +175,18 @@ export default function SettingsScreen() {
                   border: 'none',
                   fontFamily: 'IBM Plex Mono, monospace',
                   fontSize: 12,
-                  color: '#8c8a85',
+                  color: '#e84b4b',
                   cursor: 'pointer',
                   letterSpacing: '0.1em',
                   textAlign: 'left',
                   padding: '0 16px',
-                  borderBottom: '1px solid rgba(255,255,255,0.04)',
                 }}
               >
-                SIGN OUT
+                DELETE ACCOUNT
               </button>
             </div>
           </div>
         )}
-
-        {/* Danger zone */}
-        <div>
-          <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, color: '#4a5068', letterSpacing: '0.15em', textTransform: 'uppercase', margin: '0 0 8px' }}>
-            DANGER ZONE
-          </p>
-          <div style={{ background: '#12141c', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, overflow: 'hidden', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)' }}>
-            <button
-              style={{
-                width: '100%',
-                height: 52,
-                background: 'transparent',
-                border: 'none',
-                fontFamily: 'IBM Plex Mono, monospace',
-                fontSize: 12,
-                color: '#e84b4b',
-                cursor: 'pointer',
-                letterSpacing: '0.1em',
-                textAlign: 'left',
-                padding: '0 16px',
-              }}
-            >
-              DELETE ACCOUNT
-            </button>
-          </div>
-        </div>
       </motion.div>
     </div>
   );

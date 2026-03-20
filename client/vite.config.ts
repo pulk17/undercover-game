@@ -1,9 +1,18 @@
-import { defineConfig } from 'vite';
+import { defineConfig, createLogger } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import path from 'path';
 
+// Suppress noisy proxy ECONNREFUSED logs during server cold-start
+const logger = createLogger();
+const _warn = logger.warn.bind(logger);
+logger.warn = (msg, opts) => {
+  if (msg.includes('ECONNREFUSED') || msg.includes('http proxy error')) return;
+  _warn(msg, opts);
+};
+
 export default defineConfig({
+  customLogger: logger,
   plugins: [
     react(),
     VitePWA({
@@ -118,12 +127,30 @@ export default defineConfig({
   },
   server: {
     allowedHosts: ['unwitnessed-peg-spherulate.ngrok-free.dev'],
+    headers: {
+      // Allow Google sign-in popup to communicate back
+      'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
+    },
     proxy: {
-      '/api': 'http://localhost:3001',
+      '/api': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+        configure: (proxy) => {
+          proxy.on('error', (_err, _req, res) => {
+            if ('writeHead' in res) {
+              res.writeHead(502, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ data: null, error: { message: 'Server starting up, please retry' } }));
+            }
+          });
+        },
+      },
       '/socket.io': {
         target: 'http://localhost:3001',
         ws: true,
         changeOrigin: true,
+        configure: (proxy) => {
+          proxy.on('error', () => { /* server not ready yet — socket.io client will retry */ });
+        },
       },
     },
   },
