@@ -42,6 +42,9 @@ export function registerRoomHandlers(socket: Socket, io: Server): void {
       socket.join(room.code);
 
       socket.emit('room:created', { room, qrDataUrl });
+      
+      // Sync game state to set phase to 'lobby'
+      socket.emit('game:state_sync', { state: null, players: room.players });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       socket.emit('room:error', { message });
@@ -93,6 +96,9 @@ export function registerRoomHandlers(socket: Socket, io: Server): void {
       socket.join(codeValidation.sanitized);
 
       socket.emit('room:joined', { room });
+      
+      // Sync game state to set phase to 'lobby'
+      socket.emit('game:state_sync', { state: null, players: room.players });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       socket.emit('room:error', { message });
