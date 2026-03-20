@@ -1,0 +1,243 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Google Fonts ─────────────────────────────────────────────────────────── */
+/* Loaded via index.html <link> tags */
+
+/* ── CSS Variables ────────────────────────────────────────────────────────── */
+:root {
+  --bg: #08090d;
+  --surface: #12141c;
+  --surface-low: #1a1b20;
+  --surface-high: #292a2e;
+  --border: rgba(255, 255, 255, 0.07);
+  --amber: #e8c547;
+  --amber-light: #ffe285;
+  --teal: #3ecfb0;
+  --red: #e84b4b;
+  --purple: #9b6fe8;
+  --text: #e3e2e8;
+  --muted: #8c8a85;
+  --muted2: #4a5068;
+}
+
+/* ── Base ─────────────────────────────────────────────────────────────────── */
+@layer base {
+  html, body, #root {
+    background-color: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* ── Film grain overlay ───────────────────────────────────────────────────── */
+#film-grain {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0.04;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 128px 128px;
+}
+
+/* ── Shared component classes ─────────────────────────────────────────────── */
+@layer components {
+  /* Cards */
+  .card {
+    background-color: var(--surface);
+    border-radius: 14px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--border);
+  }
+
+  /* Primary CTA button — amber gradient */
+  .btn-primary {
+    background: linear-gradient(135deg, var(--amber-light), var(--amber));
+    color: #000;
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 15px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    border-radius: 12px;
+    height: 52px;
+    border: none;
+    transition: transform 100ms ease-out, opacity 100ms ease-out;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    cursor: pointer;
+  }
+  .btn-primary:active {
+    transform: scale(0.97);
+  }
+  .btn-primary:disabled {
+    opacity: 0.4;
+  }
+
+  /* Secondary ghost button */
+  .btn-secondary {
+    background: transparent;
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    letter-spacing: 0.05em;
+    border-radius: 12px;
+    height: 52px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    transition: transform 100ms ease-out;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    cursor: pointer;
+  }
+  .btn-secondary:active {
+    transform: scale(0.97);
+  }
+
+  /* Danger button */
+  .btn-danger {
+    background: var(--red);
+    color: #fff;
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 15px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    border-radius: 12px;
+    height: 52px;
+    border: none;
+    transition: transform 100ms ease-out;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    cursor: pointer;
+  }
+  .btn-danger:active {
+    transform: scale(0.97);
+  }
+  .btn-danger:disabled {
+    opacity: 0.4;
+  }
+
+  /* Mono label */
+  .label-mono {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted2);
+  }
+
+  /* Toggle */
+  .toggle-track {
+    width: 44px;
+    height: 26px;
+    border-radius: 999px;
+    transition: background-color 150ms ease;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .toggle-thumb {
+    position: absolute;
+    top: 3px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform 150ms ease;
+  }
+  .toggle-on .toggle-track { background-color: var(--teal); }
+  .toggle-off .toggle-track { background-color: var(--surface-high); }
+  .toggle-on .toggle-thumb { transform: translateX(21px); }
+  .toggle-off .toggle-thumb { transform: translateX(3px); }
+
+  /* Stagger entrance animation */
+  .stagger-in {
+    animation: staggerIn 200ms ease-out both;
+  }
+  @keyframes staggerIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Pulse dot */
+  .pulse-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    animation: pulseDot 1.4s ease-in-out infinite;
+  }
+  @keyframes pulseDot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: 0.4; transform: scale(0.7); }
+  }
+
+  /* Drain bar animation */
+  .drain-bar {
+    animation: drainBar 5s linear forwards;
+  }
+  @keyframes drainBar {
+    from { width: 100%; }
+    to   { width: 0%; }
+  }
+}
+
+/* ── Landscape warning ────────────────────────────────────────────────────── */
+@media screen and (orientation: landscape) and (max-height: 500px) {
+  body::before {
+    content: 'Please rotate your device to portrait mode';
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: var(--bg);
+    color: var(--amber);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Syne', sans-serif;
+    font-size: 1.25rem;
+    text-align: center;
+    padding: 2rem;
+  }
+}
+
+/* ── High contrast overrides ──────────────────────────────────────────────── */
+.high-contrast body {
+  background: #000;
+  color: #fff;
+  --bg: #000;
+  --surface: #111;
+  --surface-low: #1a1a1a;
+  --surface-high: #333;
+  --border: rgba(255, 255, 255, 0.4);
+  --text: #ffffff;
+  --muted: #cccccc;
+  --muted2: #dddddd;
+}
+
+.high-contrast input {
+  border-width: 2px !important;
+  border-color: #fff !important;
+}
+
+.high-contrast .btn-primary,
+.high-contrast .btn-secondary,
+.high-contrast .btn-danger {
+  border: 2px solid #fff !important;
+}
+.high-contrast .card {
+  background: #111;
+  border: 2px solid var(--border);
+}

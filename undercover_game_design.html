@@ -1,0 +1,2006 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Undercover — Web App Design Document</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0b0c10;
+    --bg2: #111318;
+    --bg3: #181b22;
+    --card: #1a1d26;
+    --card2: #21252f;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.12);
+    --accent: #e8c547;
+    --accent2: #c4a030;
+    --red: #e84b4b;
+    --blue: #4b8fe8;
+    --teal: #3ecfb0;
+    --purple: #9b6fe8;
+    --text: #e8e6df;
+    --muted: #8c8a85;
+    --muted2: #5c5a56;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'Inter', sans-serif;
+    --display: 'Syne', sans-serif;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.7;
+  }
+
+  /* ── NAV ── */
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(11,12,16,0.95);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 2rem;
+    display: flex; align-items: center; gap: 0; overflow-x: auto;
+  }
+  .nav-logo {
+    font-family: var(--display); font-weight: 800; font-size: 17px;
+    color: var(--accent); letter-spacing: -0.5px;
+    padding: 0.9rem 1.5rem 0.9rem 0; margin-right: 1rem;
+    border-right: 1px solid var(--border); white-space: nowrap;
+  }
+  nav a {
+    font-size: 12px; font-weight: 500; color: var(--muted);
+    text-decoration: none; padding: 0 1rem; height: 48px;
+    display: inline-flex; align-items: center; white-space: nowrap;
+    border-bottom: 2px solid transparent; transition: all 0.2s;
+    font-family: var(--mono); letter-spacing: 0.02em;
+  }
+  nav a:hover { color: var(--text); }
+  nav a.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* ── LAYOUT ── */
+  .container { max-width: 1100px; margin: 0 auto; padding: 0 2rem; }
+
+  /* ── HERO ── */
+  .hero {
+    padding: 5rem 2rem 4rem;
+    max-width: 1100px; margin: 0 auto;
+    border-bottom: 1px solid var(--border);
+  }
+  .hero-eyebrow {
+    font-family: var(--mono); font-size: 11px; color: var(--accent);
+    letter-spacing: 0.15em; text-transform: uppercase;
+    margin-bottom: 1.2rem; display: flex; align-items: center; gap: 0.6rem;
+  }
+  .hero-eyebrow::before {
+    content: ''; display: inline-block;
+    width: 24px; height: 1px; background: var(--accent);
+  }
+  .hero h1 {
+    font-family: var(--display); font-size: clamp(3rem, 7vw, 6rem);
+    font-weight: 800; line-height: 0.95;
+    letter-spacing: -0.03em; color: var(--text);
+    margin-bottom: 1.5rem;
+  }
+  .hero h1 span { color: var(--accent); }
+  .hero-sub {
+    font-size: 16px; color: var(--muted); max-width: 600px;
+    line-height: 1.7; margin-bottom: 2.5rem;
+  }
+  .hero-meta {
+    display: flex; gap: 2rem; flex-wrap: wrap;
+  }
+  .hero-stat { display: flex; flex-direction: column; gap: 2px; }
+  .hero-stat-num {
+    font-family: var(--display); font-size: 1.6rem; font-weight: 700;
+    color: var(--accent);
+  }
+  .hero-stat-label { font-size: 11px; color: var(--muted); font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.1em; }
+
+  /* ── SECTIONS ── */
+  section {
+    padding: 4rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .section-header {
+    display: flex; align-items: baseline; gap: 1rem;
+    margin-bottom: 2.5rem;
+  }
+  .section-num {
+    font-family: var(--mono); font-size: 11px; color: var(--accent);
+    letter-spacing: 0.1em; padding-top: 0.2rem;
+  }
+  h2 {
+    font-family: var(--display); font-size: 2rem; font-weight: 700;
+    letter-spacing: -0.02em; color: var(--text);
+  }
+  h3 {
+    font-family: var(--display); font-size: 1.2rem; font-weight: 600;
+    color: var(--text); margin-bottom: 0.6rem;
+  }
+  h4 {
+    font-family: var(--mono); font-size: 11px; color: var(--accent);
+    letter-spacing: 0.12em; text-transform: uppercase;
+    margin-bottom: 0.5rem;
+  }
+  p { color: var(--muted); line-height: 1.75; margin-bottom: 0.8rem; }
+  p:last-child { margin-bottom: 0; }
+
+  /* ── CARDS ── */
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 1.5rem;
+  }
+  .card-grid { display: grid; gap: 1rem; }
+  .card-grid-2 { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+  .card-grid-3 { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+  .card-grid-4 { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+
+  /* ── ROLE CARDS ── */
+  .role-card {
+    border-radius: 14px; padding: 1.5rem;
+    border: 1px solid var(--border);
+    position: relative; overflow: hidden;
+  }
+  .role-card::before {
+    content: ''; position: absolute;
+    top: -40px; right: -40px;
+    width: 120px; height: 120px; border-radius: 50%;
+    opacity: 0.07;
+  }
+  .role-civilian { background: linear-gradient(135deg, #1a2235 0%, #1a1d26 100%); border-color: rgba(75,143,232,0.3); }
+  .role-civilian::before { background: var(--blue); }
+  .role-undercover { background: linear-gradient(135deg, #231820 0%, #1a1d26 100%); border-color: rgba(232,75,75,0.3); }
+  .role-undercover::before { background: var(--red); }
+  .role-mrwhite { background: linear-gradient(135deg, #1f1e2a 0%, #1a1d26 100%); border-color: rgba(155,111,232,0.3); }
+  .role-mrwhite::before { background: var(--purple); }
+  .role-badge {
+    display: inline-block; font-family: var(--mono); font-size: 10px;
+    padding: 3px 10px; border-radius: 20px; font-weight: 500;
+    letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 1rem;
+  }
+  .badge-blue { background: rgba(75,143,232,0.15); color: var(--blue); border: 1px solid rgba(75,143,232,0.25); }
+  .badge-red { background: rgba(232,75,75,0.15); color: var(--red); border: 1px solid rgba(232,75,75,0.25); }
+  .badge-purple { background: rgba(155,111,232,0.15); color: var(--purple); border: 1px solid rgba(155,111,232,0.25); }
+  .badge-teal { background: rgba(62,207,176,0.15); color: var(--teal); border: 1px solid rgba(62,207,176,0.25); }
+  .badge-yellow { background: rgba(232,197,71,0.15); color: var(--accent); border: 1px solid rgba(232,197,71,0.25); }
+
+  /* ── MODE CARDS ── */
+  .mode-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 14px; padding: 1.5rem;
+    transition: border-color 0.2s, transform 0.2s;
+    cursor: default;
+  }
+  .mode-card:hover { border-color: var(--border2); transform: translateY(-2px); }
+  .mode-icon {
+    width: 44px; height: 44px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; margin-bottom: 1rem;
+  }
+  .mode-tag {
+    display: inline-block; font-family: var(--mono); font-size: 9px;
+    padding: 2px 8px; border-radius: 20px; margin-bottom: 0.8rem;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    background: var(--bg3); color: var(--muted); border: 1px solid var(--border);
+  }
+  .mode-tag.free { background: rgba(62,207,176,0.1); color: var(--teal); border-color: rgba(62,207,176,0.2); }
+  .mode-tag.premium { background: rgba(232,197,71,0.1); color: var(--accent); border-color: rgba(232,197,71,0.2); }
+
+  /* ── FLOW DIAGRAM ── */
+  .flow {
+    display: flex; align-items: flex-start;
+    gap: 0; flex-wrap: wrap; margin: 1.5rem 0;
+  }
+  .flow-step {
+    flex: 1; min-width: 140px;
+    padding: 1rem 1.2rem;
+    background: var(--card); border: 1px solid var(--border);
+    position: relative;
+  }
+  .flow-step:first-child { border-radius: 10px 0 0 10px; }
+  .flow-step:last-child { border-radius: 0 10px 10px 0; }
+  .flow-step + .flow-step { border-left: none; }
+  .flow-step-num {
+    font-family: var(--mono); font-size: 10px; color: var(--accent);
+    margin-bottom: 0.3rem; letter-spacing: 0.05em;
+  }
+  .flow-step-title { font-size: 13px; font-weight: 500; color: var(--text); }
+  .flow-step-sub { font-size: 11px; color: var(--muted); margin-top: 0.2rem; }
+  .flow-arrow {
+    align-self: center; color: var(--muted2); font-size: 18px;
+    flex-shrink: 0; padding: 0 4px;
+  }
+
+  /* ── TABLES ── */
+  table { width: 100%; border-collapse: collapse; }
+  th {
+    font-family: var(--mono); font-size: 10px; font-weight: 500;
+    color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em;
+    padding: 0.6rem 1rem; border-bottom: 1px solid var(--border);
+    text-align: left;
+  }
+  td { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); font-size: 13px; vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  .check { color: var(--teal); }
+  .cross { color: var(--muted2); }
+  .partial { color: var(--accent); }
+
+  /* ── LISTS ── */
+  .feature-list { list-style: none; display: flex; flex-direction: column; gap: 0.5rem; }
+  .feature-list li {
+    display: flex; align-items: flex-start; gap: 0.6rem;
+    font-size: 13px; color: var(--muted);
+  }
+  .feature-list li::before {
+    content: '→'; color: var(--accent); font-size: 12px;
+    flex-shrink: 0; margin-top: 2px; font-family: var(--mono);
+  }
+
+  /* ── WORD EXAMPLE ── */
+  .word-pair {
+    display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+  }
+  .word-chip {
+    padding: 0.6rem 1.2rem; border-radius: 8px;
+    font-family: var(--display); font-size: 1.1rem; font-weight: 600;
+  }
+  .word-chip.civilian { background: rgba(75,143,232,0.12); color: var(--blue); border: 1px solid rgba(75,143,232,0.2); }
+  .word-chip.undercover { background: rgba(232,75,75,0.12); color: var(--red); border: 1px solid rgba(232,75,75,0.2); }
+  .word-chip.blank { background: rgba(155,111,232,0.12); color: var(--purple); border: 1px solid rgba(155,111,232,0.2); }
+  .word-chip.vs { background: none; color: var(--muted2); font-size: 0.9rem; border: none; padding: 0; }
+
+  /* ── SCREEN WIREFRAME ── */
+  .phone-frame {
+    width: 220px; height: 440px; border-radius: 28px;
+    background: var(--bg3); border: 2px solid var(--border2);
+    overflow: hidden; position: relative; flex-shrink: 0;
+  }
+  .phone-inner { padding: 1rem; height: 100%; display: flex; flex-direction: column; gap: 0.5rem; }
+  .ph-bar { border-radius: 4px; background: var(--card2); }
+  .ph-title { height: 16px; width: 70%; }
+  .ph-sub { height: 10px; width: 45%; opacity: 0.6; }
+  .ph-card-lg { flex: 1; border-radius: 10px; background: var(--card2); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.3rem; }
+  .ph-btn { height: 38px; border-radius: 8px; background: var(--accent); opacity: 0.8; }
+  .ph-btn-ghost { height: 38px; border-radius: 8px; background: var(--card2); }
+  .ph-word { font-family: var(--display); font-size: 1.4rem; font-weight: 700; color: var(--accent); }
+  .ph-label { font-size: 9px; color: var(--muted); font-family: var(--mono); letter-spacing: 0.05em; }
+  .ph-dot-row { display: flex; gap: 4px; justify-content: center; }
+  .ph-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--card2); }
+  .ph-dot.active { background: var(--accent); }
+  .ph-avatar-row { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; padding: 0.4rem; }
+  .ph-avatar { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 600; font-family: var(--mono); }
+  .screens-scroll { display: flex; gap: 1.5rem; overflow-x: auto; padding-bottom: 1rem; }
+  .screen-wrapper { display: flex; flex-direction: column; align-items: center; gap: 0.6rem; flex-shrink: 0; }
+  .screen-label { font-family: var(--mono); font-size: 10px; color: var(--muted); text-align: center; letter-spacing: 0.05em; }
+
+  /* ── TECH STACK ── */
+  .tech-layer {
+    border: 1px solid var(--border); border-radius: 10px;
+    margin-bottom: 0.6rem; overflow: hidden;
+  }
+  .tech-layer-header {
+    padding: 0.6rem 1rem; background: var(--card2);
+    font-family: var(--mono); font-size: 10px; color: var(--muted);
+    letter-spacing: 0.1em; text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+  }
+  .tech-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; padding: 0.8rem 1rem; }
+  .tech-chip {
+    padding: 4px 12px; border-radius: 20px; font-size: 12px;
+    background: var(--card); border: 1px solid var(--border);
+    color: var(--text); font-family: var(--mono);
+  }
+  .tech-chip.primary { border-color: rgba(232,197,71,0.3); color: var(--accent); }
+
+  /* ── WIN CONDITIONS ── */
+  .win-box {
+    border-radius: 10px; padding: 1.2rem 1.4rem;
+    border-left: 3px solid;
+  }
+  .win-box.civilian { background: rgba(75,143,232,0.05); border-color: var(--blue); }
+  .win-box.undercover { background: rgba(232,75,75,0.05); border-color: var(--red); }
+  .win-box.mrwhite { background: rgba(155,111,232,0.05); border-color: var(--purple); }
+
+  /* ── DIVIDER ── */
+  .divider { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+
+  /* ── PHASE TIMELINE ── */
+  .timeline { display: flex; flex-direction: column; gap: 0; }
+  .timeline-item { display: flex; gap: 1.2rem; }
+  .timeline-left { display: flex; flex-direction: column; align-items: center; width: 32px; flex-shrink: 0; }
+  .timeline-dot {
+    width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+    border: 2px solid var(--accent); background: var(--bg); margin-top: 4px;
+  }
+  .timeline-line { flex: 1; width: 1px; background: var(--border); margin: 4px 0; }
+  .timeline-item:last-child .timeline-line { display: none; }
+  .timeline-content { padding-bottom: 1.5rem; }
+  .timeline-title { font-size: 14px; font-weight: 500; color: var(--text); margin-bottom: 0.3rem; }
+  .timeline-desc { font-size: 12px; color: var(--muted); line-height: 1.6; }
+
+  /* ── MONETIZATION ── */
+  .plan-card {
+    border-radius: 14px; padding: 1.6rem;
+    border: 1px solid var(--border); position: relative;
+  }
+  .plan-card.highlight {
+    border-color: rgba(232,197,71,0.4);
+    background: linear-gradient(135deg, #1e1c0e 0%, #1a1d26 100%);
+  }
+  .plan-price {
+    font-family: var(--display); font-size: 2.2rem; font-weight: 700;
+    color: var(--text); margin: 0.8rem 0;
+  }
+  .plan-price span { font-size: 0.9rem; font-weight: 400; color: var(--muted); }
+  .plan-name { font-family: var(--mono); font-size: 11px; color: var(--muted); letter-spacing: 0.12em; text-transform: uppercase; }
+  .popular-badge {
+    position: absolute; top: -10px; right: 1rem;
+    background: var(--accent); color: var(--bg);
+    font-family: var(--mono); font-size: 9px; font-weight: 600;
+    padding: 3px 10px; border-radius: 20px; letter-spacing: 0.1em; text-transform: uppercase;
+  }
+
+  /* ── CATEGORY GRID ── */
+  .category-pill {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    padding: 6px 14px; border-radius: 20px;
+    background: var(--card); border: 1px solid var(--border);
+    font-size: 12px; color: var(--text); margin: 0.3rem;
+    font-family: var(--mono);
+  }
+  .category-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+
+  /* ── MISC ── */
+  .tag-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.8rem; }
+  .accent { color: var(--accent); }
+  .text-muted { color: var(--muted); }
+  .code { font-family: var(--mono); font-size: 12px; color: var(--teal); background: rgba(62,207,176,0.08); padding: 1px 6px; border-radius: 4px; }
+  strong { color: var(--text); font-weight: 500; }
+  .note {
+    background: rgba(232,197,71,0.07); border: 1px solid rgba(232,197,71,0.2);
+    border-radius: 8px; padding: 0.8rem 1rem; font-size: 12px; color: var(--muted);
+  }
+  .note strong { color: var(--accent); }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+  @media (max-width: 640px) {
+    .two-col { grid-template-columns: 1fr; }
+    .hero h1 { font-size: 2.8rem; }
+    nav { padding: 0 1rem; }
+    section, .hero { padding-left: 1rem; padding-right: 1rem; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">UNDERCOVER</div>
+  <a href="#mechanics">Mechanics</a>
+  <a href="#roles">Roles</a>
+  <a href="#modes">Modes</a>
+  <a href="#words">Word System</a>
+  <a href="#phases">Game Phases</a>
+  <a href="#screens">Screens</a>
+  <a href="#multiplayer">Multiplayer</a>
+  <a href="#auth">Auth</a>
+  <a href="#progression">Progression</a>
+  <a href="#tech">Tech Stack</a>
+  <a href="#hosting">Free Hosting</a>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-eyebrow">Web App Design Document · v1.0</div>
+  <h1>Under<span>cover</span></h1>
+  <p class="hero-sub">A complete product design blueprint for a social deduction word game — covering every mechanic, mode, screen, system, and strategy.</p>
+  <div class="hero-meta">
+    <div class="hero-stat"><span class="hero-stat-num">8</span><span class="hero-stat-label">Game Modes</span></div>
+    <div class="hero-stat"><span class="hero-stat-num">3</span><span class="hero-stat-label">Player Roles</span></div>
+    <div class="hero-stat"><span class="hero-stat-num">50+</span><span class="hero-stat-label">Word Categories</span></div>
+    <div class="hero-stat"><span class="hero-stat-num">17</span><span class="hero-stat-label">App Screens</span></div>
+    <div class="hero-stat"><span class="hero-stat-num">2–12</span><span class="hero-stat-label">Players</span></div>
+    <div class="hero-stat"><span class="hero-stat-num">$0</span><span class="hero-stat-label">Hosting Cost</span></div>
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ══════════════════════════════════════
+     SECTION 1 — CORE MECHANICS
+═══════════════════════════════════════ -->
+<section id="mechanics">
+  <div class="section-header">
+    <span class="section-num">01</span>
+    <h2>Core Game Mechanics</h2>
+  </div>
+
+  <p>Undercover is a social deduction game where hidden identities meet linguistic warfare. The core tension is elegant: everyone must say enough to prove they belong, but not so much that they give away which word they actually know. Every sentence is a gamble.</p>
+  <br>
+
+  <h3>The Fundamental Premise</h3>
+  <p>A host picks a secret word pair — two words that are related but distinct. Civilians all receive Word A. The Undercover player receives Word B. Mr. White receives nothing. Each round, players give one-word or one-phrase clues about their word without saying it directly. After clues, the group votes to eliminate whoever they suspect is not one of them.</p>
+  <br>
+
+  <div class="card-grid card-grid-2">
+    <div class="card">
+      <h4>Word Pair Logic</h4>
+      <p>Word pairs must be close enough that an Undercover player can convincingly bluff, yet distinct enough that careful listeners catch inconsistencies.</p>
+      <div class="tag-row">
+        <div class="word-pair">
+          <span class="word-chip civilian">Coffee</span>
+          <span class="word-chip vs">vs</span>
+          <span class="word-chip undercover">Tea</span>
+        </div>
+      </div>
+      <div class="tag-row">
+        <div class="word-pair">
+          <span class="word-chip civilian">Swimming Pool</span>
+          <span class="word-chip vs">vs</span>
+          <span class="word-chip undercover">Lake</span>
+        </div>
+      </div>
+      <div class="tag-row">
+        <div class="word-pair">
+          <span class="word-chip civilian">Hospital</span>
+          <span class="word-chip vs">vs</span>
+          <span class="word-chip undercover">Clinic</span>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h4>The Clue Balance Problem</h4>
+      <p style="margin-bottom: 1rem;">Every player faces the same impossible tension each round, just from different angles.</p>
+      <div class="timeline">
+        <div class="timeline-item">
+          <div class="timeline-left"><div class="timeline-dot"></div><div class="timeline-line"></div></div>
+          <div class="timeline-content">
+            <div class="timeline-title">Too Vague → Voted Out</div>
+            <div class="timeline-desc">Sounds like you don't know the word. Other civilians may think you're the spy.</div>
+          </div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-left"><div class="timeline-dot"></div><div class="timeline-line"></div></div>
+          <div class="timeline-content">
+            <div class="timeline-title">Too Specific → Helps the Undercover</div>
+            <div class="timeline-desc">Giving a highly specific clue gives the Undercover player exactly the information they need to blend in.</div>
+          </div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-left"><div class="timeline-dot"></div></div>
+          <div class="timeline-content">
+            <div class="timeline-title">Just Right → Social Proof</div>
+            <div class="timeline-desc">A clue that proves you know your word without telegraphing it to outsiders.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <h3>Win Conditions</h3>
+  <div class="card-grid card-grid-3" style="margin-top: 1rem;">
+    <div class="win-box civilian">
+      <div class="role-badge badge-blue">Civilians Win</div>
+      <p>All Undercover players and Mr. White are eliminated. At least two civilians must remain at game end.</p>
+    </div>
+    <div class="win-box undercover">
+      <div class="role-badge badge-red">Undercover Wins</div>
+      <p>Number of Undercoverts equals or exceeds the number of remaining civilians at any vote phase.</p>
+    </div>
+    <div class="win-box mrwhite">
+      <div class="role-badge badge-purple">Mr. White Wins</div>
+      <p>Survives until only 3 players remain, OR correctly guesses the civilian word when eliminated.</p>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <h3>Key Tactical Dynamics</h3>
+  <div class="card-grid card-grid-2" style="margin-top:1rem;">
+    <div class="card">
+      <h4>Civilian Tactics</h4>
+      <ul class="feature-list">
+        <li>Give clues that only someone with Word A would know — use specific, niche attributes</li>
+        <li>Listen for players whose clues are slightly off — they reveal the undercover word, not the civilian one</li>
+        <li>Coordinate in discussion: "Your clue of 'bitter' works for both — say something more specific"</li>
+        <li>Don't go first — later clues let you calibrate specificity after hearing others</li>
+        <li>Avoid buzzword clues shared by both words (e.g., "drink" for coffee/tea)</li>
+        <li>Protect Mr. White accidentally — don't let them pick up too much info from your clues</li>
+        <li>Watch clue ordering — if two people gave the same clue in different rounds, one is copying</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>Undercover Tactics</h4>
+      <ul class="feature-list">
+        <li>Listen to the first 2-3 clues before deciding your strategy — derive patterns from civilian clues</li>
+        <li>Mirror civilian clue themes at the right abstraction level — match the vibe, not the word</li>
+        <li>Be the most vocal accuser — shift suspicion before the vote</li>
+        <li>Target players who are closest to outing you — eliminate your best detectives first</li>
+        <li>If your word is "Tea", and civilians say "espresso" and "foam", give a clue like "ritual" — works for both</li>
+        <li>Manufacture doubt: "That clue was weird — could mean either word"</li>
+        <li>In final 3, pivot hard: convincingly name the civilian word to win as Mr. White</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════
+     SECTION 2 — ROLES
+═══════════════════════════════════════ -->
+<section id="roles">
+  <div class="section-header">
+    <span class="section-num">02</span>
+    <h2>Player Roles</h2>
+  </div>
+
+  <div class="card-grid card-grid-3">
+    <div class="role-card role-civilian">
+      <div class="role-badge badge-blue">Civilian</div>
+      <h3>The Majority</h3>
+      <p>Receives the main (correct) word. Their job is to prove they know it without revealing it to the Undercover. They must also correctly identify and eliminate all Undercoverts and Mr. White before being voted out themselves.</p>
+      <hr class="divider" style="margin: 1rem 0;">
+      <ul class="feature-list">
+        <li>Sees: <strong>Word A</strong> (the main word)</li>
+        <li>Majority of players per game</li>
+        <li>Must distinguish between Word A and Word B nuance</li>
+        <li>Must protect the word from Mr. White's deduction</li>
+      </ul>
+    </div>
+    <div class="role-card role-undercover">
+      <div class="role-badge badge-red">Undercover</div>
+      <h3>The Impostor</h3>
+      <p>Receives a related but different word (Word B). Must blend into civilian discussions by giving plausible clues, all while deducing what the civilian word really is. The master of misdirection.</p>
+      <hr class="divider" style="margin: 1rem 0;">
+      <ul class="feature-list">
+        <li>Sees: <strong>Word B</strong> (the related word)</li>
+        <li>1–2 players per game depending on mode</li>
+        <li>Knows they are the Undercover from the start</li>
+        <li>Can optionally know other Undercoverts (mode-dependent)</li>
+      </ul>
+    </div>
+    <div class="role-card role-mrwhite">
+      <div class="role-badge badge-purple">Mr. White</div>
+      <h3>The Blank</h3>
+      <p>Receives nothing — no word at all. The hardest role. Must listen, deduce, and construct believable clues from zero information. If eliminated, may guess the civilian word to steal the win.</p>
+      <hr class="divider" style="margin: 1rem 0;">
+      <ul class="feature-list">
+        <li>Sees: <strong>Nothing</strong> — a blank card</li>
+        <li>Optional role: 0–1 per game</li>
+        <li>Only player who can win by guessing the word</li>
+        <li>Ultimate high-risk, high-reward role</li>
+      </ul>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <h3>Role Distribution Table</h3>
+  <div class="card" style="overflow-x: auto; margin-top: 1rem;">
+    <table>
+      <thead>
+        <tr>
+          <th>Total Players</th>
+          <th>Civilians</th>
+          <th>Undercover</th>
+          <th>Mr. White</th>
+          <th>Recommended Config</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>3</td><td>2</td><td>1</td><td>0</td><td>Training mode only</td></tr>
+        <tr><td>4</td><td>3</td><td>1</td><td>0</td><td>Classic Starter</td></tr>
+        <tr><td>5</td><td>3</td><td>1</td><td>1</td><td>Classic + Mr. White</td></tr>
+        <tr><td>6</td><td>4</td><td>1</td><td>1</td><td>Recommended Sweet Spot</td></tr>
+        <tr><td>7</td><td>5</td><td>1</td><td>1</td><td>Standard</td></tr>
+        <tr><td>8</td><td>5</td><td>2</td><td>1</td><td>Party Mode</td></tr>
+        <tr><td>9</td><td>6</td><td>2</td><td>1</td><td>Party Mode</td></tr>
+        <tr><td>10</td><td>7</td><td>2</td><td>1</td><td>Large Party</td></tr>
+        <tr><td>12</td><td>8</td><td>3</td><td>1</td><td>Max Party</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <hr class="divider">
+
+  <div class="two-col" style="margin-top: 1rem;">
+    <div>
+      <h3>Special Ability: Detective (Premium Role)</h3>
+      <div class="role-badge badge-yellow" style="margin-bottom: 1rem;">Optional Premium</div>
+      <p>One civilian is secretly designated as the Detective. They gain one private accusation per game — they can send a hidden accusation to the host app (or all players in a reveal moment). If correct, their team gains bonus points. If wrong, the Detective is immediately eliminated.</p>
+      <ul class="feature-list" style="margin-top: 0.8rem;">
+        <li>Only usable once, before the public vote</li>
+        <li>If correct — accused player is eliminated without a vote</li>
+        <li>If wrong — Detective is eliminated immediately</li>
+        <li>Other players do not know who the Detective is</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Mr. White's Guess Mechanics</h3>
+      <p>When Mr. White is eliminated by vote, before their role is revealed, they enter a <strong>10-second Guess Window</strong> where they type or speak the word they believe the civilians have.</p>
+      <ul class="feature-list" style="margin-top: 0.8rem;">
+        <li>Guess must be entered secretly — other players look away</li>
+        <li>Exact match OR close match (configurable) earns Mr. White a win</li>
+        <li>Failed guess: role is revealed, civilians win</li>
+        <li>Mr. White can also attempt guess at final 3 without being eliminated first</li>
+        <li>Close Match mode: synonyms accepted (e.g., "auto" for "car")</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════
+     SECTION 3 — GAME MODES
+═══════════════════════════════════════ -->
+<section id="modes">
+  <div class="section-header">
+    <span class="section-num">03</span>
+    <h2>Game Modes</h2>
+  </div>
+
+  <p>All modes are built on the same role + word system, but each changes the tension, pacing, information flow, or win condition in a meaningful way.</p>
+  <br>
+
+  <div class="card-grid card-grid-2">
+
+    <!-- Mode 1 -->
+    <div class="mode-card">
+      <div class="mode-icon" style="background: rgba(75,143,232,0.12);">🎯</div>
+      <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom: 0.8rem;">
+        <span class="mode-tag free">Free</span>
+        <span class="mode-tag">2–12 Players</span>
+      </div>
+      <h3>Classic Mode</h3>
+      <p>The original formula. One Undercover, one optional Mr. White. One clue per player per round, then a vote. Play until one side wins or choose a fixed number of rounds. The purest expression of the game.</p>
+      <ul class="feature-list" style="margin-top: 0.8rem;">
+        <li>Configurable: with or without Mr. White</li>
+        <li>Configurable clue timer: 15s / 30s / 60s / unlimited</li>
+        <li>Customizable starting player (clockwise or random)</li>
+        <li>Post-elimination role reveal: immediate or end-of-game</li>
+      </ul>
+    </div>
+
+    <!-- Mode 2 -->
+    <div class="mode-card">
+      <div class="mode-icon" style="background: rgba(232,75,75,0.12);">⚡</div>
+      <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom: 0.8rem;">
+        <span class="mode-tag free">Free</span>
+        <span class="mode-tag">4–12 Players</span>
+      </div>
+      <h3>Speed Round</h3>
+      <p>A 20-second hard timer per clue. If a player doesn't give a clue in time, they automatically receive 1 strike. Three strikes in a game = eliminated. Forces intuition over deliberation — fast chaos, fast reveals.</p>
+      <ul class="feature-list" style="margin-top: 0.8rem;">
+        <li>20s per clue (configurable: 10s / 20s / 30s)</li>
+        <li>Visible countdown on every device simultaneously</li>
+        <li>Skip penalty: 1 strike per skip</li>
+        <li>3 strikes = forced elimination, role revealed</li>
+        <li>Discussion phase is also limited: 90s total group discussion</li>
+      </ul>
+    </div>
+
+    <!-- Mode 3 -->
+    <div class="mode-card">
+      <div class="mode-icon" style="background: rgba(155,111,232,0.12);">👥</div>
+      <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom: 0.8rem;">
+        <span class="mode-tag premium">Premium</span>
+        <span class="mode-tag">6–12 Players</span>
+      </div>
+      <h3>Team Mode</h3>
+      <p>Players split into two teams (Red vs Blue). Each team has its own Undercover — Red team's spy is on the Blue team and vice versa. Teams discuss internally, then give clues alternating. First team to eliminate both enemy spies wins.</p>
+      <ul class="feature-list" style="margin-top: 0.8rem;">
+        <li>Teams can communicate privately during team phases</li>
+        <li>Each team has its own word pair — the spies have the opposite team's word</li>
+        <li>Team strategy chat: emoji-only during opponent clue turns</li>
+        <li>Bonus win: if your Undercover is never eliminated and your team wins</li>
+      </ul>
+    </div>
+
+    <!-- Mode 4 -->
+    <div class="mode-card">
+      <div class="mode-icon" style="background: rgba(62,207,176,0.12);">🌐</div>
+      <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom: 0.8rem;">
+        <span class="mode-tag premium">Premium</span>
+        <span class="mode-tag">5–10 Players</span>
+      </div>
+      <h3>Secret Alliance</h3>
+      <p>Two Undercover players are assigned. They both know each other from the start (a private notification). They must coordinate without appearing to communicate. If both survive to final 4, they both win, even if civilians are majority.</p>
+      <ul class="feature-list" style="margin-top: 0.8rem;">
+        <li>Undercoverts see a subtle icon indicating the other's identity</li>
+        <li>Cannot directly communicate — must use clue patterns as signals</li>
+        <li>Civilians must identify BOTH Undercoverts to win</li>
+        <li>If one Undercover is eliminated, the other still plays solo</li>
+      </ul>
+    </div>
+
+    <!-- Mode 5 -->
+    <div class="mode-card">
+      <div class="mode-icon" style="background: rgba(232,197,71,0.12);">🎰</div>
+      <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom: 0.8rem;">
+        <span class="mode-tag premium">Premium</span>
+        <span class="mode-tag">4–8 Players</span>
+      </div>
+      <h3>Double Agent</h3>
+      <p>Two Undercover players exist but each has a different related word. They don't know each other's identity. Now there are three word factions. Civilians must figure out there are two spies, find both, and eliminate them. The two Undercoverts are inadvertently competing against each other too.</p>
+      <ul class="feature-list" style="margin-top: 0.8rem;">
+        <li>Words: Civilians = A, Undercover 1 = B, Undercover 2 = C</li>
+        <li>Example: Apple / Pear / Orange — three word clusters in one room</li>
+        <li>Undercoverts win only if BOTH survive; partial survival = civilian win</li>
+        <li>Mr. White is disabled in this mode</li>
+      </ul>
+    </div>
+
+    <!-- Mode 6 -->
+    <div class="mode-card">
+      <div class="mode-icon" style="background: rgba(232,75,75,0.12);">🔄</div>
+      <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom: 0.8rem;">
+        <span class="mode-tag premium">Premium</span>
+        <span class="mode-tag">4–10 Players</span>
+      </div>
+      <h3>Reverse Mode</h3>
+      <p>The roles and mechanics are flipped. Undercoverts now form the majority and the Civilians are the minority. Civilians must blend into the Undercover's world. This creates a completely different psychological dynamic — paranoia is reversed.</p>
+      <ul class="feature-list" style="margin-top: 0.8rem;">
+        <li>Civilians = 1–2 players. Undercoverts = majority</li>
+        <li>Undercoverts win by eliminating all civilians</li>
+        <li>Civilians win by surviving through all rounds or being the last one standing</li>
+        <li>Discussion strategies are completely reversed</li>
+      </ul>
+    </div>
+
+    <!-- Mode 7 -->
+    <div class="mode-card">
+      <div class="mode-icon" style="background: rgba(155,111,232,0.12);">👻</div>
+      <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom: 0.8rem;">
+        <span class="mode-tag premium">Premium</span>
+        <span class="mode-tag">5–12 Players</span>
+      </div>
+      <h3>Mr. White Army</h3>
+      <p>No Undercover. Instead, 30–40% of players are Mr. White. They must all deduce the civilian word from clues and coordinate a collective guess. Each Mr. White proposes their guess during their clue turn. If majority match, they win instantly.</p>
+      <ul class="feature-list" style="margin-top: 0.8rem;">
+        <li>Civilians must vote out Mr. Whites without giving away the word</li>
+        <li>Mr. Whites secretly vote on a shared guess each round</li>
+        <li>If 2+ Mr. Whites give the same word in clue phase → instant collective guess trigger</li>
+        <li>Civilian win: all Mr. Whites eliminated before group guess</li>
+      </ul>
+    </div>
+
+    <!-- Mode 8 -->
+    <div class="mode-card">
+      <div class="mode-icon" style="background: rgba(232,197,71,0.12);">🏆</div>
+      <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom: 0.8rem;">
+        <span class="mode-tag free">Free</span>
+        <span class="mode-tag">2–12 Players</span>
+      </div>
+      <h3>Tournament Mode</h3>
+      <p>A multi-game bracket where players accumulate points across 5 games. Points are awarded for survival, correct eliminations, successful bluffs, and Mr. White correct guesses. Leaderboard shown after each game. Grand winner crowned at end.</p>
+      <ul class="feature-list" style="margin-top: 0.8rem;">
+        <li>5 games per tournament, roles rotated automatically</li>
+        <li>Points: Survive a round (+1), Correct vote (+2), Win as Undercover (+5), Win as Mr. White (+8)</li>
+        <li>Persistent lobby — no one leaves between games</li>
+        <li>Roles distributed so everyone plays Undercover at least once</li>
+      </ul>
+    </div>
+
+  </div>
+
+  <hr class="divider">
+
+  <h3>Mode Comparison Matrix</h3>
+  <div class="card" style="overflow-x:auto; margin-top: 1rem;">
+    <table>
+      <thead>
+        <tr>
+          <th>Mode</th><th>Mr. White</th><th>Team Play</th><th>Roles Revealed</th><th>Recommended For</th><th>Avg Duration</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Classic</td><td class="check">Optional</td><td class="cross">No</td><td>On elimination</td><td>All players, first games</td><td>10–20 min</td></tr>
+        <tr><td>Speed Round</td><td class="check">Optional</td><td class="cross">No</td><td>On elimination</td><td>Experienced, party setting</td><td>5–10 min</td></tr>
+        <tr><td>Team Mode</td><td class="cross">No</td><td class="check">Yes</td><td>End of game</td><td>Large groups, friends</td><td>20–30 min</td></tr>
+        <tr><td>Secret Alliance</td><td class="cross">No</td><td class="cross">No</td><td>End of game</td><td>Skilled players</td><td>15–25 min</td></tr>
+        <tr><td>Double Agent</td><td class="cross">No</td><td class="cross">No</td><td>On elimination</td><td>Advanced players</td><td>20–35 min</td></tr>
+        <tr><td>Reverse Mode</td><td class="cross">No</td><td class="cross">No</td><td>On elimination</td><td>Experienced groups</td><td>10–20 min</td></tr>
+        <tr><td>Mr. White Army</td><td class="check">Majority</td><td class="cross">No</td><td>On elimination</td><td>Large groups</td><td>15–25 min</td></tr>
+        <tr><td>Tournament</td><td class="check">Per game</td><td class="cross">No</td><td>Per game rules</td><td>Competitive regulars</td><td>60–90 min</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════
+     SECTION 4 — WORD SYSTEM
+═══════════════════════════════════════ -->
+<section id="words">
+  <div class="section-header">
+    <span class="section-num">04</span>
+    <h2>Word System & Categories</h2>
+  </div>
+
+  <p>The word database is the heart of the game's replayability. Word pairs must be curated with care — too similar and the Undercover trivially blends in; too different and they are immediately exposed. The system must also scale across age groups, cultures, and languages.</p>
+  <br>
+
+  <h3>Difficulty Tiers</h3>
+  <div class="card-grid card-grid-3" style="margin-top: 1rem; margin-bottom: 2rem;">
+    <div class="card">
+      <div class="role-badge badge-teal" style="margin-bottom:0.8rem;">Easy</div>
+      <p>Word pairs are well-known, concretely different, easily describable. Ideal for new players, families, or younger audiences. Overlap between words is high but the distinction is clear.</p>
+      <div class="tag-row">
+        <div class="word-pair" style="flex-wrap:wrap; gap: 0.5rem;">
+          <span class="word-chip civilian" style="font-size:0.85rem; padding: 4px 10px;">Dog</span>
+          <span class="word-chip vs">vs</span>
+          <span class="word-chip undercover" style="font-size:0.85rem; padding: 4px 10px;">Cat</span>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="role-badge badge-yellow" style="margin-bottom:0.8rem;">Medium</div>
+      <p>Words share attributes but exist in distinct experiential zones. Requires players to think carefully about what is specific to their word versus shared properties.</p>
+      <div class="tag-row">
+        <div class="word-pair" style="flex-wrap:wrap; gap: 0.5rem;">
+          <span class="word-chip civilian" style="font-size:0.85rem; padding: 4px 10px;">Espresso</span>
+          <span class="word-chip vs">vs</span>
+          <span class="word-chip undercover" style="font-size:0.85rem; padding: 4px 10px;">Cappuccino</span>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="role-badge badge-red" style="margin-bottom:0.8rem;">Hard</div>
+      <p>High overlap, subtle differences. Undercover players can convincingly bluff for many rounds. Civilians must listen with extreme precision. Best for experienced groups.</p>
+      <div class="tag-row">
+        <div class="word-pair" style="flex-wrap:wrap; gap: 0.5rem;">
+          <span class="word-chip civilian" style="font-size:0.85rem; padding: 4px 10px;">Accountant</span>
+          <span class="word-chip vs">vs</span>
+          <span class="word-chip undercover" style="font-size:0.85rem; padding: 4px 10px;">Auditor</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3>Word Categories (50+ Included)</h3>
+  <div style="margin-top: 1rem; margin-bottom: 1.5rem;">
+    <div>
+      <span class="category-pill"><span class="dot"></span>Food & Drink</span>
+      <span class="category-pill"><span class="dot"></span>Animals</span>
+      <span class="category-pill"><span class="dot"></span>Sports</span>
+      <span class="category-pill"><span class="dot"></span>Vehicles</span>
+      <span class="category-pill"><span class="dot"></span>Places & Travel</span>
+      <span class="category-pill"><span class="dot"></span>Jobs & Professions</span>
+      <span class="category-pill"><span class="dot"></span>Movies & TV</span>
+      <span class="category-pill"><span class="dot"></span>Music</span>
+      <span class="category-pill"><span class="dot"></span>Technology</span>
+      <span class="category-pill"><span class="dot"></span>Nature</span>
+      <span class="category-pill"><span class="dot"></span>Furniture</span>
+      <span class="category-pill"><span class="dot"></span>Clothing</span>
+      <span class="category-pill"><span class="dot"></span>Body Parts</span>
+      <span class="category-pill"><span class="dot"></span>Emotions</span>
+      <span class="category-pill"><span class="dot"></span>Historical Figures</span>
+      <span class="category-pill"><span class="dot"></span>Countries</span>
+      <span class="category-pill"><span class="dot"></span>Festivals</span>
+      <span class="category-pill"><span class="dot"></span>Instruments</span>
+      <span class="category-pill"><span class="dot"></span>Superheroes</span>
+      <span class="category-pill"><span class="dot"></span>School Subjects</span>
+      <span class="category-pill"><span class="dot"></span>Medical</span>
+      <span class="category-pill"><span class="dot"></span>Mythology</span>
+      <span class="category-pill"><span class="dot"></span>Games & Hobbies</span>
+      <span class="category-pill"><span class="dot"></span>Kitchen Items</span>
+      <span class="category-pill"><span class="dot"></span>Architecture</span>
+      <span class="category-pill"><span class="dot"></span>Science</span>
+      <span class="category-pill"><span class="dot"></span>Art</span>
+      <span class="category-pill"><span class="dot"></span>Weather</span>
+      <span class="category-pill"><span class="dot"></span>Colors</span>
+      <span class="category-pill"><span class="dot"></span>Military</span>
+      <span class="category-pill"><span class="dot" style="background:var(--accent)"></span>🔒 Seasonal Pack</span>
+      <span class="category-pill"><span class="dot" style="background:var(--accent)"></span>🔒 Pop Culture Pack</span>
+      <span class="category-pill"><span class="dot" style="background:var(--accent)"></span>🔒 Indian Regional Pack</span>
+      <span class="category-pill"><span class="dot" style="background:var(--accent)"></span>🔒 Adult Edition Pack</span>
+    </div>
+  </div>
+
+  <h3>Sample Word Pairs by Category</h3>
+  <div class="card" style="overflow-x: auto; margin-top: 1rem;">
+    <table>
+      <thead>
+        <tr><th>Category</th><th>Civilian Word</th><th>Undercover Word</th><th>Difficulty</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Food</td><td>Butter</td><td>Margarine</td><td><span class="role-badge badge-red" style="font-size:9px; margin:0">Hard</span></td><td>Near-identical use cases</td></tr>
+        <tr><td>Food</td><td>Pizza</td><td>Flatbread</td><td><span class="role-badge badge-yellow" style="font-size:9px; margin:0">Medium</span></td><td>Clear overlap, different contexts</td></tr>
+        <tr><td>Animals</td><td>Dolphin</td><td>Shark</td><td><span class="role-badge badge-teal" style="font-size:9px; margin:0">Easy</span></td><td>Both ocean, very different vibes</td></tr>
+        <tr><td>Jobs</td><td>Nurse</td><td>Doctor</td><td><span class="role-badge badge-yellow" style="font-size:9px; margin:0">Medium</span></td><td>Same setting, different authority</td></tr>
+        <tr><td>Sports</td><td>Basketball</td><td>Netball</td><td><span class="role-badge badge-red" style="font-size:9px; margin:0">Hard</span></td><td>Extremely similar mechanics</td></tr>
+        <tr><td>Places</td><td>Museum</td><td>Art Gallery</td><td><span class="role-badge badge-red" style="font-size:9px; margin:0">Hard</span></td><td>Very close — can share almost all clues</td></tr>
+        <tr><td>Tech</td><td>Laptop</td><td>Tablet</td><td><span class="role-badge badge-teal" style="font-size:9px; margin:0">Easy</span></td><td>Different enough physical form</td></tr>
+        <tr><td>Vehicles</td><td>Helicopter</td><td>Drone</td><td><span class="role-badge badge-yellow" style="font-size:9px; margin:0">Medium</span></td><td>Both fly, very different scale</td></tr>
+        <tr><td>Drink</td><td>Wine</td><td>Champagne</td><td><span class="role-badge badge-yellow" style="font-size:9px; margin:0">Medium</span></td><td>Champagne IS wine, but distinct socially</td></tr>
+        <tr><td>Music</td><td>Guitar</td><td>Ukulele</td><td><span class="role-badge badge-teal" style="font-size:9px; margin:0">Easy</span></td><td>Clear size/cultural distinction</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <hr class="divider">
+
+  <div class="two-col">
+    <div>
+      <h3>Custom Word Mode</h3>
+      <p>Players can create their own word pairs before a game. The host enters a word pair in the lobby setup screen. Custom words are not validated against difficulty — it's the players' responsibility to create fair pairs.</p>
+      <ul class="feature-list" style="margin-top: 0.8rem;">
+        <li>Host enters Word A and Word B before the game starts</li>
+        <li>Words are hidden from all players during entry</li>
+        <li>Custom pairs can be saved to a personal library</li>
+        <li>Community submission: submit pairs for app curation review</li>
+        <li>Custom Pack: group of 10+ custom pairs saved for recurring play</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Word Database Technical Design</h3>
+      <ul class="feature-list">
+        <li>Minimum 2,000 word pairs at launch across all categories</li>
+        <li>Words tagged with: language, region, age-group, difficulty, category</li>
+        <li>Anti-repeat logic: system tracks used pairs per session, avoids repeats</li>
+        <li>Localization: Hindi, Tamil, Telugu, and 6+ other languages in Year 1</li>
+        <li>Community voting on submitted word pairs (approve/flag)</li>
+        <li>A/B tested difficulty ratings — adjust based on Undercover win rate per pair</li>
+        <li>Banned word list: culturally insensitive words filtered automatically</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════
+     SECTION 5 — GAME PHASES
+═══════════════════════════════════════ -->
+<section id="phases">
+  <div class="section-header">
+    <span class="section-num">05</span>
+    <h2>Game Phases & Rules</h2>
+  </div>
+
+  <p>Each game of Undercover progresses through a strict sequence of phases. Every phase has distinct rules, timers, and UI states.</p>
+  <br>
+
+  <div class="flow" style="margin-bottom: 2rem;">
+    <div class="flow-step">
+      <div class="flow-step-num">Phase 1</div>
+      <div class="flow-step-title">Lobby & Setup</div>
+      <div class="flow-step-sub">Host configures settings</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">
+      <div class="flow-step-num">Phase 2</div>
+      <div class="flow-step-title">Role Reveal</div>
+      <div class="flow-step-sub">Private word distribution</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">
+      <div class="flow-step-num">Phase 3</div>
+      <div class="flow-step-title">Clue Round</div>
+      <div class="flow-step-sub">One clue per player</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">
+      <div class="flow-step-num">Phase 4</div>
+      <div class="flow-step-title">Discussion</div>
+      <div class="flow-step-sub">Open debate (timed)</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">
+      <div class="flow-step-num">Phase 5</div>
+      <div class="flow-step-title">Vote</div>
+      <div class="flow-step-sub">Simultaneous voting</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">
+      <div class="flow-step-num">Phase 6</div>
+      <div class="flow-step-title">Elimination</div>
+      <div class="flow-step-sub">Reveal & check win</div>
+    </div>
+  </div>
+
+  <div class="card-grid card-grid-2">
+    <div class="card">
+      <h4>Phase 1 — Lobby & Setup</h4>
+      <ul class="feature-list">
+        <li>Host selects: Game Mode, Category, Difficulty, Timer Settings, Player Count</li>
+        <li>Players join via Room Code (6-digit alphanumeric, e.g. <span class="code">WOLF42</span>)</li>
+        <li>Host can customize player nicknames or use their profiles</li>
+        <li>Host optionally enables Mr. White, Detective role</li>
+        <li>Players see a waiting room screen with animated player cards joining</li>
+        <li>Host can kick players or transfer host status</li>
+        <li>"Ready" button — game starts when all players tap ready</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>Phase 2 — Role Reveal (Private)</h4>
+      <ul class="feature-list">
+        <li>Each player holds their device face-down until told to look</li>
+        <li>App: "Everyone tap when ready to see your word — don't show others"</li>
+        <li>Player taps → word displays for 5 seconds, then auto-hides</li>
+        <li>Player can tap "Peek" to view word again (hidden tap, no log)</li>
+        <li>Mr. White sees: a blank envelope animation with "?" inside</li>
+        <li>Undercover sees: their word + subtle "UNDERCOVER" badge in red</li>
+        <li>Detective: sees their civilian word + detective badge (gold)</li>
+        <li>Once all players confirm, host starts the game</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>Phase 3 — Clue Round Rules</h4>
+      <ul class="feature-list">
+        <li>Play order shown on all screens — turn highlighted for active player</li>
+        <li>Active player must give exactly ONE clue (word, phrase, or gesture description)</li>
+        <li>Clue can be: a single word, a short phrase, a comparison, a metaphor</li>
+        <li>Clue CANNOT be: the word itself, part of the word, a direct synonym</li>
+        <li>Other players cannot react audibly until clue phase ends</li>
+        <li>Timer runs per clue (or unlimited if disabled)</li>
+        <li>All clues are logged in the app's game log for the round</li>
+        <li>Players who skip without cause receive a penalty flag</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>Phase 4 — Discussion</h4>
+      <ul class="feature-list">
+        <li>Open, free-form discussion among all surviving players</li>
+        <li>Duration: configurable — 60s / 90s / 120s / unlimited</li>
+        <li>All clues visible in a scrollable log on every device</li>
+        <li>Players may ask each other clarifying questions about their clues</li>
+        <li>No new clues allowed — discussion only</li>
+        <li>Host can extend time by 30 seconds if needed</li>
+        <li>Visual countdown timer shown to all players</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>Phase 5 — Voting</h4>
+      <ul class="feature-list">
+        <li>Each player sees a list of all surviving players (excluding themselves)</li>
+        <li>Players tap to vote — choices are submitted simultaneously</li>
+        <li>30-second voting window — abstain = no vote cast (no penalty)</li>
+        <li>Votes hidden until all are submitted or time expires</li>
+        <li>Results reveal with animated vote count per player</li>
+        <li>Tie resolution: revote between tied players only, or random elimination (configurable)</li>
+        <li>Immunity: players with most prior eliminations cannot be voted against in this round (optional rule)</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>Phase 6 — Elimination & Win Check</h4>
+      <ul class="feature-list">
+        <li>Player with most votes is eliminated — dramatic reveal animation</li>
+        <li>Role revealed: Civilian / Undercover / Mr. White</li>
+        <li>If Mr. White: 10-second guess window opens on their device</li>
+        <li>Win condition checked: if met, game ends with full role reveal</li>
+        <li>If no win: new round begins (back to Phase 3)</li>
+        <li>Eliminated players can spectate subsequent rounds</li>
+        <li>Spectators see all roles — can observe but not communicate</li>
+      </ul>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <h3>Special Rules & Edge Cases</h3>
+  <div class="card-grid card-grid-2" style="margin-top: 1rem;">
+    <div class="note">
+      <strong>Tie Vote:</strong> When two or more players are tied for elimination votes, the app offers three resolution options chosen by the host before game start: (1) Re-vote between tied players only, (2) Tied players all survive this round, (3) Random elimination among tied players. Default is option 1.
+    </div>
+    <div class="note">
+      <strong>Undercover Self-Reveal:</strong> An Undercover player may voluntarily reveal themselves at any point before voting. If they do, they have 15 seconds to name the civilian word correctly. Correct = Undercover wins immediately. Wrong = eliminated with no reveal of word (civilians don't learn the word from this).
+    </div>
+    <div class="note">
+      <strong>Final 3 Rule:</strong> When only 3 players remain, the game enters Final Confrontation mode. Mr. White (if alive) gets a final guess attempt before voting. After the vote, regardless of outcome, all roles are revealed and the win condition check occurs.
+    </div>
+    <div class="note">
+      <strong>Silent Round:</strong> An optional round type (host-enabled) where no clue is given — players only observe body language and must vote based on previous rounds. Adds a theatrical, pressure-cooker element for in-person play.
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════
+     SECTION 6 — SCREENS & UX
+═══════════════════════════════════════ -->
+<section id="screens">
+  <div class="section-header">
+    <span class="section-num">06</span>
+    <h2>App Screens & UX Design</h2>
+  </div>
+
+  <p>The app has 17 core screens across 4 navigation zones. All screens must work for the "pass the phone" pattern in local play with minimal UI visible to unintended players. The web app is fully responsive — optimized for mobile browsers first, with a comfortable desktop layout for setup and spectating.</p>
+  <br>
+
+  <div class="screens-scroll">
+
+    <!-- Screen 1: Home -->
+    <div class="screen-wrapper">
+      <div class="phone-frame">
+        <div class="phone-inner">
+          <div style="height:8px;"></div>
+          <div style="font-family: var(--display); font-size: 22px; font-weight:800; color: var(--accent); text-align:center; margin-bottom: 0.3rem;">UNDERCOVER</div>
+          <div style="height: 1px; background: var(--border); margin: 0.3rem 0;"></div>
+          <div class="ph-card-lg" style="background: linear-gradient(135deg, rgba(232,197,71,0.08), rgba(232,75,75,0.06)); border: 1px solid rgba(232,197,71,0.2);">
+            <div style="font-size: 32px;">🕵️</div>
+            <div style="font-size: 9px; color: var(--muted); font-family: var(--mono);">Who is the spy?</div>
+          </div>
+          <div class="ph-btn" style="margin-top: 0.5rem;"></div>
+          <div class="ph-btn-ghost"></div>
+          <div class="ph-btn-ghost"></div>
+        </div>
+      </div>
+      <div class="screen-label">Home / Main Menu</div>
+    </div>
+
+    <!-- Screen 2: Lobby -->
+    <div class="screen-wrapper">
+      <div class="phone-frame">
+        <div class="phone-inner">
+          <div class="ph-bar ph-title"></div>
+          <div class="ph-bar ph-sub"></div>
+          <div style="display: flex; justify-content: center; margin: 0.5rem 0;">
+            <div style="font-family: var(--mono); font-size: 22px; font-weight:700; color: var(--accent); letter-spacing: 0.2em; background: rgba(232,197,71,0.1); padding: 0.6rem 1.2rem; border-radius: 8px; border: 1px solid rgba(232,197,71,0.25);">WOLF42</div>
+          </div>
+          <div class="ph-avatar-row">
+            <div class="ph-avatar" style="background: rgba(75,143,232,0.2); color: var(--blue);">AK</div>
+            <div class="ph-avatar" style="background: rgba(232,75,75,0.2); color: var(--red);">PR</div>
+            <div class="ph-avatar" style="background: rgba(62,207,176,0.2); color: var(--teal);">RJ</div>
+            <div class="ph-avatar" style="background: rgba(155,111,232,0.2); color: var(--purple);">SK</div>
+            <div class="ph-avatar" style="background: var(--card2); color: var(--muted);">+</div>
+          </div>
+          <div class="ph-bar" style="height: 28px; border-radius: 6px; background: var(--card2); margin: 0.3rem 0;"></div>
+          <div class="ph-bar" style="height: 28px; border-radius: 6px; background: var(--card2); margin: 0.3rem 0;"></div>
+          <div class="ph-btn" style="margin-top: auto;"></div>
+        </div>
+      </div>
+      <div class="screen-label">Room Lobby</div>
+    </div>
+
+    <!-- Screen 3: Role Reveal -->
+    <div class="screen-wrapper">
+      <div class="phone-frame">
+        <div class="phone-inner">
+          <div style="font-size: 10px; color: var(--muted); font-family: var(--mono); text-align:center; margin-top: 0.5rem;">YOUR ROLE</div>
+          <div class="ph-card-lg" style="background: rgba(75,143,232,0.08); border: 1px solid rgba(75,143,232,0.2); flex: 0; height: 50px; border-radius: 8px; margin: 0.3rem 0;">
+            <div style="font-size: 10px; color: var(--blue); font-family: var(--mono); letter-spacing: 0.1em;">CIVILIAN</div>
+          </div>
+          <div class="ph-card-lg" style="gap: 0.5rem;">
+            <div style="font-size: 10px; color: var(--muted); font-family: var(--mono);">YOUR WORD</div>
+            <div class="ph-word">ESPRESSO</div>
+            <div style="font-size: 9px; color: var(--muted2); font-family: var(--mono); text-align:center;">Remember this. Don't show anyone.</div>
+          </div>
+          <div style="font-size: 9px; color: var(--muted); text-align: center; font-family: var(--mono); margin-top: 0.3rem;">Auto-hides in 5s</div>
+          <div class="ph-btn" style="opacity: 0.5;"></div>
+        </div>
+      </div>
+      <div class="screen-label">Role Reveal (Private)</div>
+    </div>
+
+    <!-- Screen 4: Clue Phase -->
+    <div class="screen-wrapper">
+      <div class="phone-frame">
+        <div class="phone-inner">
+          <div class="ph-bar ph-title" style="width:50%; margin: 0 auto;"></div>
+          <div style="display: flex; justify-content: center; margin: 0.3rem 0;">
+            <div style="font-family: var(--mono); font-size: 28px; font-weight: 700; color: var(--accent);">:24</div>
+          </div>
+          <div style="display:flex; align-items: center; gap: 0.5rem; padding: 0.5rem; background: var(--card2); border-radius: 8px; margin: 0.2rem 0;">
+            <div class="ph-avatar" style="background: rgba(75,143,232,0.2); color: var(--blue); width: 24px; height: 24px; font-size: 8px; flex-shrink: 0;">AK</div>
+            <div style="flex:1;">
+              <div class="ph-bar" style="height:8px; width: 70%;"></div>
+            </div>
+            <div style="font-size: 9px; color: var(--teal); font-family: var(--mono);">✓</div>
+          </div>
+          <div style="display:flex; align-items: center; gap: 0.5rem; padding: 0.5rem; background: rgba(232,197,71,0.05); border: 1px solid rgba(232,197,71,0.2); border-radius: 8px; margin: 0.2rem 0;">
+            <div class="ph-avatar" style="background: rgba(232,197,71,0.2); color: var(--accent); width: 24px; height: 24px; font-size: 8px; flex-shrink: 0;">PR</div>
+            <div style="flex:1; font-size: 9px; color: var(--accent); font-family: var(--mono);">Your Turn →</div>
+          </div>
+          <div style="display:flex; align-items: center; gap: 0.5rem; padding: 0.5rem; background: var(--card2); border-radius: 8px; margin: 0.2rem 0; opacity: 0.4;">
+            <div class="ph-avatar" style="background: rgba(62,207,176,0.2); color: var(--teal); width: 24px; height: 24px; font-size: 8px; flex-shrink: 0;">RJ</div>
+            <div style="flex:1;"><div class="ph-bar" style="height:8px; width: 40%;"></div></div>
+          </div>
+          <div class="ph-btn" style="margin-top: auto;"></div>
+        </div>
+      </div>
+      <div class="screen-label">Clue Phase</div>
+    </div>
+
+    <!-- Screen 5: Voting -->
+    <div class="screen-wrapper">
+      <div class="phone-frame">
+        <div class="phone-inner">
+          <div style="font-size: 10px; color: var(--muted); font-family: var(--mono); text-align: center; margin-top: 0.4rem;">VOTE TO ELIMINATE</div>
+          <div style="display: flex; justify-content: center; font-family: var(--mono); font-size: 24px; color: var(--red); margin: 0.2rem 0;">:18</div>
+          <div style="display:flex; flex-direction: column; gap: 0.4rem; flex: 1;">
+            <div style="padding: 0.5rem; background: var(--card2); border-radius: 8px; display: flex; align-items: center; gap: 0.5rem;">
+              <div class="ph-avatar" style="background: rgba(75,143,232,0.2); color: var(--blue); width:28px;height:28px;font-size:9px;">AK</div>
+              <div style="flex:1;"><div class="ph-bar" style="height:8px;width:60%;"></div></div>
+            </div>
+            <div style="padding: 0.5rem; background: rgba(232,75,75,0.1); border: 1px solid rgba(232,75,75,0.3); border-radius: 8px; display: flex; align-items: center; gap: 0.5rem;">
+              <div class="ph-avatar" style="background: rgba(232,75,75,0.2); color: var(--red);width:28px;height:28px;font-size:9px;">RJ</div>
+              <div style="flex:1;"><div class="ph-bar" style="height:8px;width:40%;"></div></div>
+              <div style="font-size:9px; color: var(--red); font-family: var(--mono);">✓</div>
+            </div>
+            <div style="padding: 0.5rem; background: var(--card2); border-radius: 8px; display: flex; align-items: center; gap: 0.5rem;">
+              <div class="ph-avatar" style="background: rgba(62,207,176,0.2); color: var(--teal);width:28px;height:28px;font-size:9px;">SK</div>
+              <div style="flex:1;"><div class="ph-bar" style="height:8px;width:50%;"></div></div>
+            </div>
+          </div>
+          <div class="ph-btn-ghost" style="margin-top: 0.3rem;"></div>
+        </div>
+      </div>
+      <div class="screen-label">Voting Screen</div>
+    </div>
+
+    <!-- Screen 6: Elimination -->
+    <div class="screen-wrapper">
+      <div class="phone-frame">
+        <div class="phone-inner">
+          <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem;">
+            <div class="ph-avatar" style="width: 60px; height: 60px; font-size: 18px; background: rgba(232,75,75,0.15); color: var(--red); border: 2px solid rgba(232,75,75,0.3);">RJ</div>
+            <div style="font-family: var(--display); font-size: 1rem; font-weight: 700; color: var(--text); text-align:center;">Rahul Joshi</div>
+            <div style="font-size: 10px; color: var(--muted); font-family:var(--mono);">was eliminated</div>
+            <div style="padding: 6px 16px; border-radius: 20px; background: rgba(232,75,75,0.15); color: var(--red); font-family: var(--mono); font-size: 10px; border: 1px solid rgba(232,75,75,0.3); letter-spacing: 0.1em;">UNDERCOVER</div>
+            <div style="font-size: 9px; color: var(--muted); text-align:center;">Their word was<br><strong style="color: var(--text);">Cappuccino</strong></div>
+          </div>
+          <div style="border-top: 1px solid var(--border); padding-top: 0.5rem;">
+            <div style="display:flex; justify-content:space-between; font-size:9px; color: var(--muted); font-family: var(--mono);">
+              <span>Civilians: 3</span><span>Undercover: 0</span><span>Mr. White: 1</span>
+            </div>
+          </div>
+          <div class="ph-btn" style="margin-top: 0.5rem;"></div>
+        </div>
+      </div>
+      <div class="screen-label">Elimination Reveal</div>
+    </div>
+
+    <!-- Screen 7: Game Over -->
+    <div class="screen-wrapper">
+      <div class="phone-frame">
+        <div class="phone-inner">
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0.5rem;">
+            <div style="font-size: 36px;">🏆</div>
+            <div style="font-family: var(--display); font-size: 1.2rem; font-weight: 800; color: var(--accent);">Civilians Win!</div>
+            <div style="font-size: 10px; color: var(--muted); font-family: var(--mono); text-align:center;">The word was<br><strong style="color: var(--text); font-size: 14px;">ESPRESSO</strong></div>
+            <div style="height: 1px; width: 80%; background: var(--border); margin: 0.5rem 0;"></div>
+            <div style="font-size: 9px; color: var(--muted); font-family: var(--mono); text-align:center;">MVP: Ananya (+8 pts)<br>Best Bluff: Rahul (+2 pts)</div>
+          </div>
+          <div class="ph-btn"></div>
+          <div class="ph-btn-ghost"></div>
+        </div>
+      </div>
+      <div class="screen-label">Game Over / Results</div>
+    </div>
+
+  </div>
+
+  <hr class="divider">
+
+  <h3>Full Screen Map</h3>
+  <div class="card" style="overflow-x:auto; margin-top: 1rem;">
+    <table>
+      <thead><tr><th>#</th><th>Screen Name</th><th>Zone</th><th>Key Elements</th><th>Navigation From</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>Splash / Loading</td><td>System</td><td>Logo animation, version check</td><td>App launch</td></tr>
+        <tr><td>2</td><td>Onboarding</td><td>Auth</td><td>3-slide tutorial + Google SSO</td><td>First launch</td></tr>
+        <tr><td>3</td><td>Main Menu / Home</td><td>Home</td><td>Create Room, Join Room, Profile, Settings</td><td>After login</td></tr>
+        <tr><td>4</td><td>Create Room</td><td>Setup</td><td>Mode selector, word category, player settings, timer config</td><td>Main menu</td></tr>
+        <tr><td>5</td><td>Join Room</td><td>Setup</td><td>6-digit code entry, QR scan</td><td>Main menu</td></tr>
+        <tr><td>6</td><td>Room Lobby</td><td>Setup</td><td>Room code display, player cards, host controls, ready state</td><td>After join/create</td></tr>
+        <tr><td>7</td><td>Role Reveal</td><td>Game</td><td>Private word display, role badge, 5-second auto-hide</td><td>Game start</td></tr>
+        <tr><td>8</td><td>Clue Phase</td><td>Game</td><td>Turn order, timer, clue log, active player highlight</td><td>After role reveal</td></tr>
+        <tr><td>9</td><td>Discussion Phase</td><td>Game</td><td>Clue history log, discussion timer, extend time button</td><td>After clue phase</td></tr>
+        <tr><td>10</td><td>Voting Screen</td><td>Game</td><td>Player list, vote tap, simultaneous reveal, countdown</td><td>After discussion</td></tr>
+        <tr><td>11</td><td>Elimination Screen</td><td>Game</td><td>Eliminated player reveal, role reveal animation, word reveal</td><td>After voting</td></tr>
+        <tr><td>12</td><td>Mr. White Guess</td><td>Game</td><td>Text input, 10-second timer, private view</td><td>On Mr. White elimination</td></tr>
+        <tr><td>13</td><td>Game Over / Results</td><td>Game</td><td>Winner, MVP, word reveal, stats, play again</td><td>Win condition met</td></tr>
+        <tr><td>14</td><td>Profile</td><td>Account</td><td>Avatar, stats, win rate, game history, achievements</td><td>Main menu</td></tr>
+        <tr><td>15</td><td>Settings</td><td>Account</td><td>Audio, notifications, language, account, feedback</td><td>Main menu</td></tr>
+        <tr><td>16</td><td>Leaderboard</td><td>Social</td><td>Global, friends, weekly rankings, filter by mode</td><td>Main menu</td></tr>
+        <tr><td>17</td><td>How to Play</td><td>Help</td><td>Animated tutorial, role explanations, examples</td><td>Main menu / onboarding</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <hr class="divider">
+
+  <h3>UI Design Language</h3>
+  <div class="card-grid card-grid-2" style="margin-top: 1rem;">
+    <div class="card">
+      <h4>Visual Identity</h4>
+      <ul class="feature-list">
+        <li>Dark-first UI — primary mode is dark background (near black)</li>
+        <li>Accent color: Amber/Gold (#E8C547) — used sparingly for key CTAs and highlights</li>
+        <li>Role colors: Blue (Civilian), Red (Undercover), Purple (Mr. White)</li>
+        <li>Typeface: Display — Syne or similar geometric bold for headings; Sans-serif for UI</li>
+        <li>Monospace font for codes, timers, and role labels (IBM Plex Mono)</li>
+        <li>Card-based layout for player slots, clue logs, and settings panels</li>
+        <li>Microanimations: role reveal flip card, vote count increment, elimination particle burst</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>UX Principles</h4>
+      <ul class="feature-list">
+        <li>One primary action per screen — no decision paralysis in game screens</li>
+        <li>Private screens: shake to dismiss, fingerprint-gated "peek" for word recall</li>
+        <li>Accessibility: large tap targets (44px min), high contrast modes, text size scaling</li>
+        <li>Vibration feedback on your turn notification</li>
+        <li>Portrait-only during gameplay; landscape allowed in menus</li>
+        <li>No app navigation during active game phase — modal-only interactions</li>
+        <li>Offline-safe: game state cached locally in case of connection drop</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════
+     SECTION 7 — MULTIPLAYER
+═══════════════════════════════════════ -->
+<section id="multiplayer">
+  <div class="section-header">
+    <span class="section-num">07</span>
+    <h2>Multiplayer Architecture</h2>
+  </div>
+
+  <div class="card-grid card-grid-3" style="margin-bottom: 2rem;">
+    <div class="card">
+      <div class="mode-icon" style="background: rgba(62,207,176,0.12); margin-bottom: 0.8rem;">🌐</div>
+      <h3>Online Multiplayer</h3>
+      <p>Players on different devices in different locations join the same game room. Real-time state synchronization via WebSockets. All game events (clues, votes, eliminations) pushed to all clients instantly.</p>
+    </div>
+    <div class="card">
+      <div class="mode-icon" style="background: rgba(75,143,232,0.12); margin-bottom: 0.8rem;">📱</div>
+      <h3>Local (Pass-and-Play)</h3>
+      <p>One device, multiple players sitting together. Each player takes the phone for their private role reveal. All other game phases shown on-screen for everyone. No internet required after initial word load.</p>
+    </div>
+    <div class="card">
+      <div class="mode-icon" style="background: rgba(232,197,71,0.12); margin-bottom: 0.8rem;">🔗</div>
+      <h3>Hybrid Mode</h3>
+      <p>Host device runs the game, other players optionally join via their own phones as secondary displays. Remote players see the same game state in real time but use the host for game authority.</p>
+    </div>
+  </div>
+
+  <h3>Room System</h3>
+  <div class="card-grid card-grid-2" style="margin-top: 1rem;">
+    <div class="card">
+      <h4>Room Creation & Codes</h4>
+      <ul class="feature-list">
+        <li>Room Code: 6-character alphanumeric, e.g. <span class="code">WOLF42</span> — readable, no ambiguous chars (0/O, 1/I)</li>
+        <li>QR Code: generated per room for quick local join (scan = instant join)</li>
+        <li>Room link: shareable deep link <span class="code">undercoverapp.io/join/WOLF42</span></li>
+        <li>Room expiry: 24 hours after last activity</li>
+        <li>Private rooms: password-protected (optional)</li>
+        <li>Public rooms: matchmaking queue (join any open game)</li>
+        <li>Room capacity: 2–12 players (hard cap)</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>Host Controls</h4>
+      <ul class="feature-list">
+        <li>Kick player from room (with reason: "inactive", "wrong room")</li>
+        <li>Transfer host role to another player mid-lobby</li>
+        <li>Mute clue timer (per player, if they're experiencing issues)</li>
+        <li>Pause game (emergency pause visible to all)</li>
+        <li>Extend discussion time (+30s button)</li>
+        <li>Force-start when all players marked "ready"</li>
+        <li>Reset game: keep same players, draw new roles and words</li>
+        <li>End game early (host override — shown as host-ended, not a win/loss)</li>
+      </ul>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <h3>Connection & Resilience</h3>
+  <div class="card-grid card-grid-2" style="margin-top: 1rem;">
+    <div class="card">
+      <h4>Reconnect Flow</h4>
+      <ul class="feature-list">
+        <li>Player disconnects mid-game → shown as "Away" on all screens</li>
+        <li>60-second reconnect window — game continues if others are present</li>
+        <li>On reconnect, player receives full current game state</li>
+        <li>If word was already assigned, it is restored securely (encrypted in session)</li>
+        <li>Host disconnect: auto-transfer to longest-connected player</li>
+        <li>If host fails to reconnect in 90s, remaining players can vote a new host</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>Spectator Mode</h4>
+      <ul class="feature-list">
+        <li>Eliminated players become spectators — they see all roles immediately</li>
+        <li>Spectators can see who voted for whom after each round</li>
+        <li>Spectators have a hidden emoji-react toolbar (💀 🙀 😆 👀) visible only to other spectators</li>
+        <li>Observers can join as spectators from the start (no role assigned)</li>
+        <li>Up to 5 spectators per room (free tier), unlimited (premium)</li>
+        <li>Spectator view mode: "Full View" (all roles visible) or "Neutral" (roles hidden)</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════
+     SECTION 8 — AUTH (GOOGLE SSO)
+═══════════════════════════════════════ -->
+<section id="auth">
+  <div class="section-header">
+    <span class="section-num">08</span>
+    <h2>Authentication & Google SSO</h2>
+  </div>
+
+  <div class="two-col">
+    <div>
+      <h3>Auth Flow</h3>
+      <div class="timeline" style="margin-top: 1rem;">
+        <div class="timeline-item">
+          <div class="timeline-left"><div class="timeline-dot"></div><div class="timeline-line"></div></div>
+          <div class="timeline-content">
+            <div class="timeline-title">App Launch → Onboarding Check</div>
+            <div class="timeline-desc">If first launch: show 3-step onboarding carousel explaining the game. If returning: check for valid session token. Silent re-auth if token valid.</div>
+          </div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-left"><div class="timeline-dot"></div><div class="timeline-line"></div></div>
+          <div class="timeline-content">
+            <div class="timeline-title">Sign In Screen</div>
+            <div class="timeline-desc">"Continue with Google" button triggers Google One Tap or full OAuth sheet. No email/password option — SSO-only for simplicity and security.</div>
+          </div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-left"><div class="timeline-dot"></div><div class="timeline-line"></div></div>
+          <div class="timeline-content">
+            <div class="timeline-title">Firebase Auth Processes Token</div>
+            <div class="timeline-desc">Google OAuth token passed to Firebase Authentication. Firebase returns UID, email, display name, and profile photo URL.</div>
+          </div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-left"><div class="timeline-dot"></div><div class="timeline-line"></div></div>
+          <div class="timeline-content">
+            <div class="timeline-title">Profile Creation / Merge</div>
+            <div class="timeline-desc">New user: create Firestore profile document. Existing user: load profile, restore preferences, sync stats from Firestore.</div>
+          </div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-left"><div class="timeline-dot"></div></div>
+          <div class="timeline-content">
+            <div class="timeline-title">Session Token Stored Securely</div>
+            <div class="timeline-desc">Firebase ID token stored in an httpOnly cookie (not localStorage — XSS-safe). Refreshed automatically every hour via Firebase SDK. Session stays valid for 30 days of inactivity before re-auth required.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <h3>Guest Mode</h3>
+      <p>Players can play without a Google account in Guest Mode. Guests get a randomly generated nickname (e.g., "SnakePlant47") and limited access.</p>
+      <ul class="feature-list" style="margin-top: 0.8rem; margin-bottom: 1.5rem;">
+        <li>Can create or join rooms normally</li>
+        <li>No stats saved between sessions</li>
+        <li>No leaderboard access</li>
+        <li>Can upgrade to full account (Google SSO) without losing current session</li>
+        <li>Guest data merged into Google account on sign-in</li>
+      </ul>
+
+      <h3>What the App Stores</h3>
+      <ul class="feature-list">
+        <li>Google UID (unique identifier — no password stored)</li>
+        <li>Display name and avatar URL from Google</li>
+        <li>Custom in-game nickname (user-editable, 12 char max)</li>
+        <li>Game stats: games played, wins, eliminations, win rate per role</li>
+        <li>Achievement flags and XP level</li>
+        <li>Purchased word packs and premium status</li>
+        <li>Friends list (mutual follows)</li>
+        <li>App preferences (theme, language, timer default)</li>
+      </ul>
+
+      <div class="note" style="margin-top: 1rem;">
+        <strong>Privacy:</strong> No personal data sold or shared. Google sign-in used only for identity. Players can delete their account and all data from Settings at any time.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════
+     SECTION 9 — PROGRESSION
+═══════════════════════════════════════ -->
+<section id="progression">
+  <div class="section-header">
+    <span class="section-num">09</span>
+    <h2>Player Progression & Social</h2>
+  </div>
+
+  <div class="card-grid card-grid-2" style="margin-bottom: 2rem;">
+    <div class="card">
+      <h4>XP & Levelling</h4>
+      <p>Players earn XP (Experience Points) for every game action. XP feeds into a level system that unlocks cosmetic rewards and bragging rights.</p>
+      <div class="card" style="background: var(--card2); margin-top: 1rem;">
+        <table style="font-size:12px;">
+          <thead><tr><th>Action</th><th>XP Earned</th></tr></thead>
+          <tbody>
+            <tr><td>Play any game</td><td class="accent">+10 XP</td></tr>
+            <tr><td>Win as Civilian</td><td class="accent">+20 XP</td></tr>
+            <tr><td>Win as Undercover</td><td class="accent">+40 XP</td></tr>
+            <tr><td>Win as Mr. White (guess)</td><td class="accent">+60 XP</td></tr>
+            <tr><td>Survive 3+ rounds</td><td class="accent">+15 XP</td></tr>
+            <tr><td>Correctly vote the spy</td><td class="accent">+10 XP</td></tr>
+            <tr><td>Daily play bonus</td><td class="accent">+25 XP</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <h4>Level Tiers & Titles</h4>
+      <ul class="feature-list">
+        <li><strong>Level 1–5</strong> — "Rookie" · Unlocks: basic avatar frames</li>
+        <li><strong>Level 6–15</strong> — "Agent" · Unlocks: role-specific animations</li>
+        <li><strong>Level 16–30</strong> — "Operative" · Unlocks: custom room themes</li>
+        <li><strong>Level 31–50</strong> — "Infiltrator" · Unlocks: special word packs</li>
+        <li><strong>Level 51–80</strong> — "Mastermind" · Unlocks: early mode access</li>
+        <li><strong>Level 81+</strong> — "Phantom" · Unlocks: exclusive cosmetics, verified badge</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>Achievements System</h3>
+  <div class="card" style="overflow-x: auto; margin-top: 1rem; margin-bottom: 2rem;">
+    <table>
+      <thead><tr><th>Achievement</th><th>Condition</th><th>Reward</th></tr></thead>
+      <tbody>
+        <tr><td>🕵️ First Spy</td><td>Win your first game as Undercover</td><td>+50 XP + "Rookie Spy" title</td></tr>
+        <tr><td>👻 Ghost</td><td>Win 10 games as Mr. White via correct guess</td><td>+200 XP + "Ghost" avatar frame</td></tr>
+        <tr><td>🎯 Sharpshooter</td><td>Correctly identify the Undercover 20 times</td><td>+150 XP</td></tr>
+        <tr><td>🧠 Mind Reader</td><td>Vote correctly as the only voter in a round</td><td>+80 XP</td></tr>
+        <tr><td>🦁 Last Standing</td><td>Be the last civilian standing with 1 undercover remaining</td><td>+100 XP</td></tr>
+        <tr><td>💬 Silver Tongue</td><td>Survive 5 full rounds as Undercover without being voted</td><td>+120 XP</td></tr>
+        <tr><td>📅 7-Day Streak</td><td>Play at least one game every day for 7 days</td><td>+175 XP + Streak avatar</td></tr>
+        <tr><td>🌍 Globetrotter</td><td>Play in 5 different word categories in one session</td><td>+60 XP</td></tr>
+        <tr><td>🏆 Champion</td><td>Win a Tournament Mode with 8+ players</td><td>+300 XP + Champion badge</td></tr>
+        <tr><td>🤝 Social Butterfly</td><td>Play 10 games with friends (from friend list)</td><td>+100 XP</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Social Features</h3>
+  <div class="card-grid card-grid-3" style="margin-top: 1rem;">
+    <div class="card">
+      <h4>Friends System</h4>
+      <ul class="feature-list">
+        <li>Search by username or Google contact</li>
+        <li>Friend request system (mutual accept)</li>
+        <li>See friends' online status and current room</li>
+        <li>Quick invite: send friend a room link in one tap</li>
+        <li>Friends leaderboard (separate from global)</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>Leaderboard</h4>
+      <ul class="feature-list">
+        <li>Global, Friends, and Country leaderboards</li>
+        <li>Ranked by: total wins, win rate, XP, undercover wins</li>
+        <li>Weekly reset with season rewards</li>
+        <li>Top 100 get special profile border</li>
+        <li>Seasonal leaderboard per game mode</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>Share & Post-Game</h4>
+      <ul class="feature-list">
+        <li>Share result card to Instagram Stories / WhatsApp</li>
+        <li>Result card shows: word pair, roles revealed, winner, duration</li>
+        <li>Replay button: restart same configuration with same players</li>
+        <li>Game summary sent to all players via push notification</li>
+        <li>Funny post-game titles: "Best Liar", "Most Suspicious" voted by players</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════
+     SECTION 10 — TECH STACK (WEB APP)
+═══════════════════════════════════════ -->
+<section id="tech">
+  <div class="section-header">
+    <span class="section-num">10</span>
+    <h2>Tech Stack — Web App</h2>
+  </div>
+
+  <p>The stack is chosen for maximum velocity, zero infrastructure cost, and real-time performance on mobile browsers. Everything is JavaScript/TypeScript end-to-end with a Google-first ecosystem that directly supports the Google SSO requirement.</p>
+  <br>
+
+  <div class="two-col">
+    <div>
+
+      <div class="tech-layer">
+        <div class="tech-layer-header">Frontend — Web App (PWA)</div>
+        <div class="tech-chips">
+          <span class="tech-chip primary">React 18 + TypeScript</span>
+          <span class="tech-chip primary">Vite (build tool)</span>
+          <span class="tech-chip">React Router v6</span>
+          <span class="tech-chip">Zustand (state management)</span>
+          <span class="tech-chip">Tailwind CSS</span>
+          <span class="tech-chip">Framer Motion (animations)</span>
+          <span class="tech-chip">PWA (installable on mobile)</span>
+          <span class="tech-chip">Service Worker (offline support)</span>
+        </div>
+      </div>
+
+      <div class="tech-layer">
+        <div class="tech-layer-header">Authentication</div>
+        <div class="tech-chips">
+          <span class="tech-chip primary">Firebase Authentication</span>
+          <span class="tech-chip primary">Google Sign-In (OAuth 2.0)</span>
+          <span class="tech-chip">Firebase SDK v10 (modular)</span>
+          <span class="tech-chip">JWT stored in httpOnly cookie</span>
+          <span class="tech-chip">Google One Tap (instant re-auth)</span>
+        </div>
+      </div>
+
+      <div class="tech-layer">
+        <div class="tech-layer-header">Real-Time Game Engine</div>
+        <div class="tech-chips">
+          <span class="tech-chip primary">Socket.IO (WebSockets)</span>
+          <span class="tech-chip primary">Node.js + Express server</span>
+          <span class="tech-chip">Redis (room state + pub/sub)</span>
+          <span class="tech-chip">Socket.IO rooms (per game room)</span>
+          <span class="tech-chip">Reconnect logic built-in</span>
+        </div>
+      </div>
+
+      <div class="tech-layer">
+        <div class="tech-layer-header">Database</div>
+        <div class="tech-chips">
+          <span class="tech-chip primary">Firestore (user profiles, stats)</span>
+          <span class="tech-chip primary">PostgreSQL via Supabase (word DB)</span>
+          <span class="tech-chip">Redis (active game state — ephemeral)</span>
+        </div>
+      </div>
+
+      <div class="tech-layer">
+        <div class="tech-layer-header">API Layer</div>
+        <div class="tech-chips">
+          <span class="tech-chip primary">REST API (Express)</span>
+          <span class="tech-chip">Zod (input validation)</span>
+          <span class="tech-chip">Rate limiting (express-rate-limit)</span>
+          <span class="tech-chip">Helmet.js (security headers)</span>
+          <span class="tech-chip">CORS configured per origin</span>
+        </div>
+      </div>
+
+      <div class="tech-layer">
+        <div class="tech-layer-header">Monitoring & Analytics</div>
+        <div class="tech-chips">
+          <span class="tech-chip primary">Firebase Analytics</span>
+          <span class="tech-chip">Sentry (error tracking — free tier)</span>
+          <span class="tech-chip">Uptime Robot (free uptime monitoring)</span>
+          <span class="tech-chip">Render built-in logs</span>
+        </div>
+      </div>
+
+    </div>
+
+    <div>
+
+      <div class="card" style="margin-bottom: 0.8rem;">
+        <h4>PWA — Why This Matters</h4>
+        <p>A Progressive Web App delivers an app-like experience from the browser — no app store needed. Players on Android can install it to their home screen and it behaves like a native app.</p>
+        <ul class="feature-list" style="margin-top: 0.8rem;">
+          <li>Installable on Android and iOS from Chrome/Safari</li>
+          <li>Fullscreen mode — hides browser UI during gameplay</li>
+          <li>Offline fallback: cached UI loads even without internet (game logic still requires connection)</li>
+          <li>Push notifications via Web Push API (Chrome/Android)</li>
+          <li>App icon, splash screen, and orientation lock via Web App Manifest</li>
+          <li>Works in browser too — zero friction for new players</li>
+        </ul>
+      </div>
+
+      <div class="card" style="margin-bottom: 0.8rem;">
+        <h4>Game State Architecture</h4>
+        <p>Server-authoritative model: all game logic runs on the Node.js server. Clients are pure display layers — they emit events and render state, never compute it.</p>
+        <div class="flow" style="margin-top: 0.8rem; flex-wrap: wrap; gap: 0.3rem;">
+          <div class="flow-step" style="min-width: 80px; padding: 0.5rem 0.7rem; border-radius: 6px;">
+            <div class="flow-step-num" style="font-size:9px;">Client</div>
+            <div class="flow-step-title" style="font-size:11px;">Emit event</div>
+          </div>
+          <div class="flow-arrow" style="font-size: 14px;">→</div>
+          <div class="flow-step" style="min-width: 80px; padding: 0.5rem 0.7rem; border-radius: 6px;">
+            <div class="flow-step-num" style="font-size:9px;">Server</div>
+            <div class="flow-step-title" style="font-size:11px;">Validate + mutate</div>
+          </div>
+          <div class="flow-arrow" style="font-size: 14px;">→</div>
+          <div class="flow-step" style="min-width: 80px; padding: 0.5rem 0.7rem; border-radius: 6px;">
+            <div class="flow-step-num" style="font-size:9px;">Redis</div>
+            <div class="flow-step-title" style="font-size:11px;">Store state</div>
+          </div>
+          <div class="flow-arrow" style="font-size: 14px;">→</div>
+          <div class="flow-step" style="min-width: 80px; padding: 0.5rem 0.7rem; border-radius: 6px;">
+            <div class="flow-step-num" style="font-size:9px;">Broadcast</div>
+            <div class="flow-step-title" style="font-size:11px;">Push to room</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h4>Word Security (Web Context)</h4>
+        <ul class="feature-list">
+          <li>Words never sent to all clients — each player's word delivered in a private socket event to their socket ID only</li>
+          <li>Words stored in Redis under encrypted keys, expire at game end</li>
+          <li>No word ever appears in URL, query params, or browser history</li>
+          <li>Peek (re-view word) re-requests from server — no local storage</li>
+          <li>Mr. White's payload is identical size to word payloads — traffic analysis-proof</li>
+          <li>HTTPS enforced — all WebSocket connections over WSS</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <h3>Security & Anti-Cheat</h3>
+  <div class="card-grid card-grid-2" style="margin-top: 1rem;">
+    <div class="card">
+      <h4>API & Transport Security</h4>
+      <ul class="feature-list">
+        <li>All HTTP: HTTPS only (TLS 1.3). All WebSocket: WSS only</li>
+        <li>Firebase ID token verified on every socket connection handshake</li>
+        <li>Helmet.js: sets CSP, X-Frame-Options, HSTS, XSS-Protection headers</li>
+        <li>Rate limiting: 100 requests/15min per IP on REST endpoints</li>
+        <li>Socket events rate limited: max 2 events/second per socket</li>
+        <li>CORS whitelist: only approved origins can connect</li>
+        <li>Input sanitized and validated with Zod schemas on every event</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>Game Integrity</h4>
+      <ul class="feature-list">
+        <li>Server-authoritative: clients cannot advance game phases themselves</li>
+        <li>All votes validated: player must be alive, must not have voted in this round</li>
+        <li>Role assignment: <span class="code">crypto.randomBytes</span> for cryptographic shuffle</li>
+        <li>Words never broadcast to room — only private socket.emit to specific socketId</li>
+        <li>Game state transitions logged with timestamps — auditable trail</li>
+        <li>Spectators receive redacted game state — roles hidden until revealed</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════
+     SECTION 11 — FREE HOSTING STRATEGY
+═══════════════════════════════════════ -->
+<section id="hosting">
+  <div class="section-header">
+    <span class="section-num">11</span>
+    <h2>Free Hosting Strategy</h2>
+  </div>
+
+  <p>The entire stack can run at <strong>$0/month</strong> using free tiers from four services. The key constraint to design around is <strong>cold starts</strong> — free servers spin down after inactivity. The architecture below eliminates cold starts as a gameplay problem through smart client-side handling.</p>
+  <br>
+
+  <div class="card-grid card-grid-2" style="margin-bottom: 2rem;">
+
+    <div class="card">
+      <div style="display:flex; align-items:center; gap:0.8rem; margin-bottom:1rem;">
+        <div class="mode-icon" style="background: rgba(62,207,176,0.12); margin:0; width:36px; height:36px; font-size:16px;">🌐</div>
+        <div>
+          <h3 style="margin:0;">Frontend — Vercel</h3>
+          <div class="role-badge badge-teal" style="margin:0;">Free Forever</div>
+        </div>
+      </div>
+      <ul class="feature-list">
+        <li>Deploy React/Vite app from GitHub — automatic on every push</li>
+        <li>Global CDN — assets served from the nearest edge node worldwide</li>
+        <li>Free tier: 100GB bandwidth/month — more than sufficient for a game app</li>
+        <li>Custom domain supported on free tier (your own .com)</li>
+        <li>HTTPS automatically provisioned (Let's Encrypt)</li>
+        <li>Preview deployments: every PR gets its own URL for testing</li>
+        <li>Zero configuration needed — Vite auto-detected</li>
+      </ul>
+      <div class="note" style="margin-top: 1rem;">
+        <strong>Limit to watch:</strong> 100GB bandwidth/month. At ~500KB per game session (assets cached after first visit), this supports roughly 200,000 sessions/month before needing an upgrade.
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex; align-items:center; gap:0.8rem; margin-bottom:1rem;">
+        <div class="mode-icon" style="background: rgba(232,75,75,0.12); margin:0; width:36px; height:36px; font-size:16px;">⚡</div>
+        <div>
+          <h3 style="margin:0;">Backend — Render.com</h3>
+          <div class="role-badge badge-yellow" style="margin:0;">Free Tier</div>
+        </div>
+      </div>
+      <ul class="feature-list">
+        <li>Node.js + Express + Socket.IO server deployed as a Web Service</li>
+        <li>Deploy from GitHub — automatic on push to main branch</li>
+        <li>Free tier: 750 hours/month (enough for 24/7 operation)</li>
+        <li>Supports WebSockets natively — critical for real-time game events</li>
+        <li>Environment variables managed in Render dashboard</li>
+        <li>Automatic HTTPS + WSS — no SSL configuration needed</li>
+        <li>Health check endpoint keeps server awake during active periods</li>
+      </ul>
+      <div class="note" style="margin-top: 1rem;">
+        <strong>Cold start problem:</strong> Free tier spins down after 15 minutes of inactivity. Solution: client-side "warming" — the frontend pings <span class="code">/health</span> on app load. A splash screen animation naturally covers the ~10-second wake time.
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex; align-items:center; gap:0.8rem; margin-bottom:1rem;">
+        <div class="mode-icon" style="background: rgba(75,143,232,0.12); margin:0; width:36px; height:36px; font-size:16px;">🗄️</div>
+        <div>
+          <h3 style="margin:0;">Database — Supabase</h3>
+          <div class="role-badge badge-teal" style="margin:0;">Free Forever</div>
+        </div>
+      </div>
+      <ul class="feature-list">
+        <li>PostgreSQL database for word pairs, user profiles, game history</li>
+        <li>Free tier: 500MB storage, 2GB bandwidth/month</li>
+        <li>Supabase Auth as a Firebase Auth alternative (optional: use both)</li>
+        <li>Row Level Security (RLS) — fine-grained access control per user</li>
+        <li>Real-time subscriptions (can replace some Socket.IO use cases)</li>
+        <li>Dashboard with SQL editor, table browser, and migration tooling</li>
+        <li>REST and JS SDK — easy to query from Node.js backend</li>
+      </ul>
+      <div class="note" style="margin-top: 1rem;">
+        <strong>Word database fit:</strong> 2,000 word pairs × ~200 bytes = ~400KB. Comfortably within free tier. Queries cached in Redis so DB is rarely hit during gameplay.
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex; align-items:center; gap:0.8rem; margin-bottom:1rem;">
+        <div class="mode-icon" style="background: rgba(155,111,232,0.12); margin:0; width:36px; height:36px; font-size:16px;">🔴</div>
+        <div>
+          <h3 style="margin:0;">Cache / State — Upstash Redis</h3>
+          <div class="role-badge badge-teal" style="margin:0;">Free Forever</div>
+        </div>
+      </div>
+      <ul class="feature-list">
+        <li>Serverless Redis — stores active game room state ephemerally</li>
+        <li>Free tier: 10,000 commands/day, 256MB storage</li>
+        <li>Each active room uses ~2–5KB of Redis storage</li>
+        <li>State auto-expires: rooms set TTL of 24h — no manual cleanup</li>
+        <li>REST API mode: works from serverless environments and Render</li>
+        <li>Used for: active room state, word assignments, vote tallies, clue log</li>
+        <li>Player sessions also cached here — fast reads during gameplay</li>
+      </ul>
+      <div class="note" style="margin-top: 1rem;">
+        <strong>Capacity math:</strong> Each game = ~200 Redis commands. Free tier supports ~50 concurrent games/day. Upgrade to Upstash Pro ($10/month) unlocks unlimited commands.
+      </div>
+    </div>
+
+  </div>
+
+  <h3>Auth — Firebase Free Tier</h3>
+  <div class="card" style="margin-top: 1rem; margin-bottom: 2rem;">
+    <div class="card-grid card-grid-2">
+      <div>
+        <h4>Firebase Auth Limits (Free Spark Plan)</h4>
+        <ul class="feature-list">
+          <li>50,000 Monthly Active Users — free forever</li>
+          <li>Google Sign-In included at no cost</li>
+          <li>Unlimited email verification and password reset emails</li>
+          <li>Firebase SDK: modular v10 — only imports what you use (tree-shaken)</li>
+          <li>ID tokens valid for 1 hour, refresh tokens valid indefinitely</li>
+        </ul>
+      </div>
+      <div>
+        <h4>Firestore Limits (Free Spark Plan)</h4>
+        <ul class="feature-list">
+          <li>1GB storage — stores user profiles, achievements, game history</li>
+          <li>50,000 reads/day — covers casual player activity well</li>
+          <li>20,000 writes/day — triggered only on game end, achievement unlock, profile update</li>
+          <li>Firestore reads cached client-side — profile loaded once per session</li>
+          <li>Only write to Firestore at game boundaries, not during real-time play (Redis handles that)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <h3>Cold Start Mitigation Strategy</h3>
+  <div class="card-grid card-grid-2" style="margin-top: 1rem; margin-bottom: 2rem;">
+    <div class="card">
+      <h4>Client-Side Approach</h4>
+      <ul class="feature-list">
+        <li>On app load, immediately fire a silent GET to <span class="code">GET /health</span> — wakes server in background</li>
+        <li>Splash animation lasts 2–4 seconds — masks the server wake latency completely</li>
+        <li>If server wake takes longer, a "Connecting..." skeleton UI is shown — not a blank screen</li>
+        <li>Socket.IO reconnection: <span class="code">reconnectionAttempts: 10</span>, <span class="code">reconnectionDelay: 1000</span></li>
+        <li>Toast notification: "Connecting to server..." with spinner if initial connection takes &gt;3s</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>Server-Side Approach</h4>
+      <ul class="feature-list">
+        <li><span class="code">GET /health</span> endpoint returns <span class="code">200 OK</span> in &lt;5ms — used by both client and Render health checker</li>
+        <li>UptimeRobot (free plan): pings <span class="code">/health</span> every 5 minutes — effectively keeps server awake 24/7 during active periods</li>
+        <li>UptimeRobot limit: free tier monitors 50 URLs every 5 min — more than enough</li>
+        <li>During low-traffic nights (2–6am IST), occasional cold starts are acceptable — no active players</li>
+        <li>Game rooms store "last active" timestamp — stale rooms cleaned up on server restart</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>Deployment Pipeline</h3>
+  <div class="timeline" style="margin-top: 1rem; margin-bottom: 2rem;">
+    <div class="timeline-item">
+      <div class="timeline-left"><div class="timeline-dot"></div><div class="timeline-line"></div></div>
+      <div class="timeline-content">
+        <div class="timeline-title">GitHub Monorepo — <span class="code">/client</span> + <span class="code">/server</span></div>
+        <div class="timeline-desc">Single repository with two packages. Client = React/Vite app. Server = Node.js/Express/Socket.IO. Shared types in <span class="code">/shared/types.ts</span> — socket event types, game state interfaces, role enums defined once, used in both client and server.</div>
+      </div>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-left"><div class="timeline-dot"></div><div class="timeline-line"></div></div>
+      <div class="timeline-content">
+        <div class="timeline-title">Push to <span class="code">main</span> → Automatic Deploy</div>
+        <div class="timeline-desc">Vercel auto-deploys the client folder. Render auto-deploys the server folder. Both triggered by the same GitHub push. Total deploy time: ~90 seconds frontend, ~2 minutes backend.</div>
+      </div>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-left"><div class="timeline-dot"></div><div class="timeline-line"></div></div>
+      <div class="timeline-content">
+        <div class="timeline-title">Environment Variables — Never in Code</div>
+        <div class="timeline-desc">Firebase config in Vercel env vars. Supabase + Redis URLs in Render env vars. Google OAuth client ID in both. No secrets ever committed to git. <span class="code">.env.example</span> documents all required variables for new contributors.</div>
+      </div>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-left"><div class="timeline-dot"></div><div class="timeline-line"></div></div>
+      <div class="timeline-content">
+        <div class="timeline-title">Preview Environments for Testing</div>
+        <div class="timeline-desc">Every PR on GitHub gets a Vercel preview URL automatically. Backend can be pointed to a separate Render staging service (or the same one). Test new modes and word packs in preview before merging to main.</div>
+      </div>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-left"><div class="timeline-dot"></div></div>
+      <div class="timeline-content">
+        <div class="timeline-title">Custom Domain Setup</div>
+        <div class="timeline-desc">Point <span class="code">undercover.yourdomain.com</span> to Vercel (CNAME record). Point <span class="code">api.undercover.yourdomain.com</span> to Render service. Namecheap and Cloudflare both offer free DNS management.</div>
+      </div>
+    </div>
+  </div>
+
+  <h3>Scaling Path (When Free Limits Are Hit)</h3>
+  <div class="card" style="overflow-x: auto; margin-top: 1rem; margin-bottom: 2rem;">
+    <table>
+      <thead>
+        <tr><th>Service</th><th>Free Limit</th><th>First Paid Tier</th><th>Trigger to Upgrade</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Vercel</td><td>100GB bandwidth/month</td><td>$20/month (Pro)</td><td>&gt;50K unique users/month</td></tr>
+        <tr><td>Render</td><td>750 hours/month + spin-down</td><td>$7/month (Starter — always-on)</td><td>Cold starts becoming user complaints</td></tr>
+        <tr><td>Supabase</td><td>500MB DB + 2GB bandwidth</td><td>$25/month (Pro)</td><td>Word DB + user profiles &gt;400MB</td></tr>
+        <tr><td>Upstash Redis</td><td>10K commands/day</td><td>$0.2 per 100K commands</td><td>&gt;50 concurrent active games/day</td></tr>
+        <tr><td>Firebase Auth</td><td>50K MAU</td><td>Pay-as-you-go ($0.0055/MAU)</td><td>&gt;50K monthly active users</td></tr>
+        <tr><td>Sentry</td><td>5K errors/month</td><td>$26/month</td><td>Active production error debugging needed</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <strong>Bottom line:</strong> The entire stack runs at $0/month until you hit approximately 50,000 monthly active users or 50+ concurrent games per day — well beyond the scale of a new app launch. The only realistic early cost is a custom domain (~₹800/year from Namecheap).
+  </div>
+</section>
+
+</section>
+
+<!-- ══════════════════════════════════════
+     FOOTER
+═══════════════════════════════════════ -->
+<div style="padding: 3rem 0; text-align: center; border-top: 1px solid var(--border);">
+  <div style="font-family: var(--display); font-size: 2rem; font-weight: 800; color: var(--accent); margin-bottom: 0.5rem;">UNDERCOVER</div>
+  <div style="font-family: var(--mono); font-size: 11px; color: var(--muted2); letter-spacing: 0.1em;">Web App Design Document · Version 1.0 · 2025</div>
+  <div style="font-size: 12px; color: var(--muted2); margin-top: 0.5rem;">8 Modes · 3 Roles · 50+ Categories · 17 Screens · Full Multiplayer · $0 Hosting</div>
+</div>
+
+</div><!-- end .container -->
+
+<script>
+  const navLinks = document.querySelectorAll('nav a');
+  const sections = document.querySelectorAll('section');
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        navLinks.forEach(l => l.classList.remove('active'));
+        const active = document.querySelector(`nav a[href="#${entry.target.id}"]`);
+        if (active) active.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-40% 0px -55% 0px' });
+  sections.forEach(s => observer.observe(s));
+</script>
+
+</body>
+</html>
