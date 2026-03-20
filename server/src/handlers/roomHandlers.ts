@@ -11,10 +11,20 @@ export function registerRoomHandlers(socket: Socket, io: Server): void {
       const { config, passwordHash } = payload;
       const user = socket.data.user;
 
+      const { validateNickname, logValidationError } = await import('../lib/validation');
+
+      // Validate nickname
+      const nicknameValidation = validateNickname(user.displayName ?? 'Player');
+      if (!nicknameValidation.valid) {
+        logValidationError('room_create', nicknameValidation.error!, { userId: user.uid });
+        socket.emit('room:error', { message: nicknameValidation.error });
+        return;
+      }
+
       const hostPlayer: Player = {
         id: socket.id,
         userId: user.uid,
-        nickname: user.displayName ?? 'Player',
+        nickname: nicknameValidation.sanitized,
         avatarUrl: user.photoURL ?? null,
         role: null,
         word: null,
@@ -45,10 +55,28 @@ export function registerRoomHandlers(socket: Socket, io: Server): void {
       const upperCode = code.toUpperCase();
       const user = socket.data.user;
 
+      const { validateRoomCode, validateNickname, logValidationError } = await import('../lib/validation');
+
+      // Validate room code
+      const codeValidation = validateRoomCode(upperCode);
+      if (!codeValidation.valid) {
+        logValidationError('room_join', codeValidation.error!, { userId: user.uid, code: upperCode });
+        socket.emit('room:error', { message: codeValidation.error });
+        return;
+      }
+
+      // Validate nickname
+      const nicknameValidation = validateNickname(user.displayName ?? 'Player');
+      if (!nicknameValidation.valid) {
+        logValidationError('room_join', nicknameValidation.error!, { userId: user.uid });
+        socket.emit('room:error', { message: nicknameValidation.error });
+        return;
+      }
+
       const player: Player = {
         id: socket.id,
         userId: user.uid,
-        nickname: user.displayName ?? 'Player',
+        nickname: nicknameValidation.sanitized,
         avatarUrl: user.photoURL ?? null,
         role: null,
         word: null,
@@ -59,10 +87,10 @@ export function registerRoomHandlers(socket: Socket, io: Server): void {
         strikes: 0,
       };
 
-      const room = await joinRoom(upperCode, player, passwordHash, io);
+      const room = await joinRoom(codeValidation.sanitized, player, passwordHash, io);
 
-      socket.data.roomCode = upperCode;
-      socket.join(upperCode);
+      socket.data.roomCode = codeValidation.sanitized;
+      socket.join(codeValidation.sanitized);
 
       socket.emit('room:joined', { room });
     } catch (err: unknown) {

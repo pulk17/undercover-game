@@ -41,14 +41,9 @@ export function startMrWhiteGuessTimer(roomCode: string, io: Server): void {
   const timer = setTimeout(async () => {
     mrWhiteGuessTimers.delete(roomCode);
     try {
-      const rawState = await redis.get<string>(`game:${roomCode}`);
-      if (!rawState) return;
-
-      const gameState: GameState =
-        typeof rawState === 'string' ? JSON.parse(rawState) : (rawState as GameState);
-
-      // Only act if still in mr_white_guess phase (guard against race conditions)
-      if (gameState.phase !== 'mr_white_guess') return;
+      const { loadAndValidatePhase } = await import('../lib/phaseTransition');
+      const gameState = await loadAndValidatePhase(roomCode, 'mr_white_guess');
+      if (!gameState) return;
 
       const room = await getRoom(roomCode);
       if (!room) return;
@@ -100,14 +95,9 @@ export function startSelfRevealTimer(
   const timer = setTimeout(async () => {
     selfRevealTimers.delete(roomCode);
     try {
-      const rawState = await redis.get<string>(`game:${roomCode}`);
-      if (!rawState) return;
-
-      const gameState: GameState =
-        typeof rawState === 'string' ? JSON.parse(rawState) : (rawState as GameState);
-
-      // Only act if still in self_reveal phase
-      if (gameState.phase !== 'self_reveal') return;
+      const { loadAndValidatePhase } = await import('../lib/phaseTransition');
+      const gameState = await loadAndValidatePhase(roomCode, 'self_reveal');
+      if (!gameState) return;
 
       const room = await getRoom(roomCode);
       if (!room) return;
@@ -694,6 +684,17 @@ export function registerGameHandlers(socket: Socket, io: Server): void {
       const roomCode = socket.data.roomCode as string | undefined;
       if (!roomCode) return;
 
+      const { validateWordGuess, logValidationError } = await import('../lib/validation');
+      const { logger } = await import('../lib/logger');
+
+      // Validate and sanitize guess
+      const validation = validateWordGuess(guess);
+      if (!validation.valid) {
+        logValidationError('mr_white_guess', validation.error!, { roomCode, playerId: socket.id });
+        socket.emit('room:error', { message: validation.error });
+        return;
+      }
+
       const rawState = await redis.get<string>(`game:${roomCode}`);
       if (!rawState) return;
 
@@ -734,7 +735,7 @@ export function registerGameHandlers(socket: Socket, io: Server): void {
       // Cancel the auto-expiry timer
       cancelMrWhiteGuessTimer(roomCode);
 
-      const isCorrect = isWordGuessCorrect(guess, civilianWord);
+      const isCorrect = isWordGuessCorrect(validation.sanitized, civilianWord);
 
       if (isCorrect) {
         // Mr. White wins
@@ -846,6 +847,17 @@ export function registerGameHandlers(socket: Socket, io: Server): void {
       const roomCode = socket.data.roomCode as string | undefined;
       if (!roomCode) return;
 
+      const { validateWordGuess, logValidationError } = await import('../lib/validation');
+      const { logger } = await import('../lib/logger');
+
+      // Validate and sanitize guess
+      const validation = validateWordGuess(guess);
+      if (!validation.valid) {
+        logValidationError('self_reveal_guess', validation.error!, { roomCode, playerId: socket.id });
+        socket.emit('room:error', { message: validation.error });
+        return;
+      }
+
       const rawState = await redis.get<string>(`game:${roomCode}`);
       if (!rawState) return;
 
@@ -890,7 +902,7 @@ export function registerGameHandlers(socket: Socket, io: Server): void {
       // Clean up side-channel key
       await redis.del(`self_reveal:${roomCode}`);
 
-      const isCorrect = isWordGuessCorrect(guess, civilianWord);
+      const isCorrect = isWordGuessCorrect(validation.sanitized, civilianWord);
 
       if (isCorrect) {
         // Undercover wins by correctly naming the civilian word
@@ -1229,6 +1241,16 @@ export function registerGameHandlers(socket: Socket, io: Server): void {
       const roomCode = socket.data.roomCode as string | undefined;
       if (!roomCode) return;
 
+      const { validateTitle, logValidationError } = await import('../lib/validation');
+
+      // Validate and sanitize title
+      const validation = validateTitle(title);
+      if (!validation.valid) {
+        logValidationError('title_vote', validation.error!, { roomCode, playerId: socket.id });
+        socket.emit('room:error', { message: validation.error });
+        return;
+      }
+
       const room = await getRoom(roomCode);
       if (!room) return;
 
@@ -1253,7 +1275,7 @@ export function registerGameHandlers(socket: Socket, io: Server): void {
 
       // Increment vote count
       if (!allVotes[targetPlayerId]) allVotes[targetPlayerId] = {};
-      allVotes[targetPlayerId][title] = (allVotes[targetPlayerId][title] ?? 0) + 1;
+      allVotes[targetPlayerId][validation.sanitized] = (allVotes[targetPlayerId][validation.sanitized] ?? 0) + 1;
 
       await redis.set(votesKey, JSON.stringify(allVotes), { ex: TTL_10_MIN });
 
@@ -1453,6 +1475,10 @@ export function registerGameHandlers(socket: Socket, io: Server): void {
       }
 
       await redis.set(`game:${roomCode}`, JSON.stringify(gameState), { ex: GAME_TTL });
+
+      // Register active room for timer cleanup
+      const { registerActiveRoom } = await import('../lib/timerCleanup');
+      registerActiveRoom(roomCode);
 
       // Update room phase
       room.phase = 'role_reveal';

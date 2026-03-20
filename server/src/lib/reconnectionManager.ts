@@ -133,7 +133,7 @@ async function startHostGracePeriod(
   hostGraceTimers.set(roomCode, timer);
 }
 
-export export function cancelHostGraceTimer(roomCode: string): void {
+export function cancelHostGraceTimer(roomCode: string): void {
   const existing = hostGraceTimers.get(roomCode);
   if (existing !== undefined) {
     clearTimeout(existing);

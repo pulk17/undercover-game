@@ -33,7 +33,7 @@ export function validateClue(clue: string): { valid: boolean; sanitized: string;
 /**
  * Validate and sanitize word guess
  */
-export function validateGuess(guess: string): { valid: boolean; sanitized: string; error?: string } {
+export function validateWordGuess(guess: string): { valid: boolean; sanitized: string; error?: string } {
   const sanitized = sanitizeText(guess).slice(0, MAX_GUESS_LENGTH);
   
   if (!sanitized) {
@@ -46,6 +46,11 @@ export function validateGuess(guess: string): { valid: boolean; sanitized: strin
   
   return { valid: true, sanitized };
 }
+
+/**
+ * Alias for backward compatibility
+ */
+export const validateGuess = validateWordGuess;
 
 /**
  * Validate and sanitize title vote
@@ -84,18 +89,18 @@ export function validateNickname(nickname: string): { valid: boolean; sanitized:
 /**
  * Validate room code format
  */
-export function validateRoomCode(code: string): { valid: boolean; normalized: string; error?: string } {
-  const normalized = String(code ?? '').toUpperCase().trim();
+export function validateRoomCode(code: string): { valid: boolean; sanitized: string; error?: string } {
+  const sanitized = String(code ?? '').toUpperCase().trim();
   
-  if (normalized.length !== 6) {
-    return { valid: false, normalized, error: 'Room code must be 6 characters' };
+  if (sanitized.length !== 6) {
+    return { valid: false, sanitized, error: 'Room code must be 6 characters' };
   }
   
-  if (!/^[A-Z2-9]+$/.test(normalized)) {
-    return { valid: false, normalized, error: 'Room code contains invalid characters' };
+  if (!/^[A-Z2-9]+$/.test(sanitized)) {
+    return { valid: false, sanitized, error: 'Room code contains invalid characters' };
   }
   
-  return { valid: true, normalized };
+  return { valid: true, sanitized };
 }
 
 /**

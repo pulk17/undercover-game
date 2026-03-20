@@ -3,6 +3,7 @@ import type { GameState } from '@undercover/shared';
 import { redis } from './redis';
 import { getRoom } from '../managers/RoomManager';
 import { toPublicGameState } from '../handlers/gameHandlers';
+import { loadAndValidatePhase } from './phaseTransition';
 
 const GAME_TTL = 60 * 60 * 24; // 24 hours
 const VOTE_PHASE_DURATION_MS = 30_000; // 30 seconds
@@ -81,17 +82,13 @@ export async function startVotePhase(
  * Delegates to revealVotes to compute the tally and transition to elimination.
  */
 async function handleVoteExpiry(roomCode: string, io: Server): Promise<void> {
-  const rawState = await redis.get<string>(`game:${roomCode}`);
-  if (!rawState) return;
-
-  const gameState: GameState =
-    typeof rawState === 'string' ? JSON.parse(rawState) : (rawState as GameState);
-
-  // Only transition if still in vote phase
-  if (gameState.phase !== 'vote') return;
+  const { loadAndValidatePhase } = await import('./phaseTransition');
+  const gameState = await loadAndValidatePhase(roomCode, 'vote');
+  if (!gameState) return;
 
   await revealVotes(roomCode, gameState, io);
 }
+
 
 /**
  * Reveals votes and transitions to the elimination phase (or resolves a tie).

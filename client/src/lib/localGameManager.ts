@@ -447,7 +447,7 @@ export class LocalGameManager {
         this.advanceRound();
         break;
       case 'random':
-        this.emit('tie_broken', { eliminatedPlayerId: eliminatedId, strategy: 'random' });
+        this.emit('tie_broken', { eliminatedPlayerId: eliminatedId!, strategy: 'random' });
         this.eliminatePlayer(eliminatedId!);
         break;
       case 're_vote':

@@ -3,6 +3,7 @@ import type { GameState } from '@undercover/shared';
 import { redis } from './redis';
 import { getRoom } from '../managers/RoomManager';
 import { toPublicGameState } from '../handlers/gameHandlers';
+import { loadAndValidatePhase } from './phaseTransition';
 
 const GAME_TTL = 60 * 60 * 24; // 24 hours
 
@@ -84,14 +85,9 @@ export async function startDiscussionPhase(
 // ─── Timer expiry ─────────────────────────────────────────────────────────────
 
 async function handleDiscussionExpiry(roomCode: string, io: Server): Promise<void> {
-  const rawState = await redis.get<string>(`game:${roomCode}`);
-  if (!rawState) return;
-
-  const gameState: GameState =
-    typeof rawState === 'string' ? JSON.parse(rawState) : (rawState as GameState);
-
-  // Only transition if still in discussion phase
-  if (gameState.phase !== 'discussion') return;
+  const { loadAndValidatePhase } = await import('./phaseTransition');
+  const gameState = await loadAndValidatePhase(roomCode, 'discussion');
+  if (!gameState) return;
 
   const { startVotePhase } = await import('./voteManager');
   await startVotePhase(io, roomCode, gameState);

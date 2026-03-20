@@ -93,6 +93,8 @@ export async function touchRoom(code: string): Promise<void> {
 }
 
 export async function deleteRoom(code: string): Promise<void> {
+  const { unregisterActiveRoom } = await import('../lib/timerCleanup');
+  unregisterActiveRoom(code);
   await redis.del(roomKey(code), gameKey(code), usedWordsKey(code));
 }
 
