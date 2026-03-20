@@ -7,6 +7,7 @@ const envSchema = z.object({
   VITE_FIREBASE_APP_ID: z.string().default(''),
   VITE_GOOGLE_CLIENT_ID: z.string().default(''),
   VITE_API_BASE_URL: z.string().default('/api/v1'),
+  VITE_SOCKET_URL: z.string().default(''),
   VITE_SENTRY_DSN: z.string().optional(),
 });
 
