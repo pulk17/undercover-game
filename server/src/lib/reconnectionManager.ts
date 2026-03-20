@@ -19,6 +19,24 @@ function hostGraceKey(code: string): string {
   return `host_grace:${code}`;
 }
 
+async function moveRedisValue(fromKey: string, toKey: string, ttlSeconds: number): Promise<void> {
+  const raw = await redis.get<string>(fromKey);
+  if (!raw) return;
+  await redis.set(toKey, raw, { ex: ttlSeconds });
+  await redis.del(fromKey);
+}
+
+async function replaceSetMember(key: string, oldId: string, newId: string): Promise<void> {
+  try {
+    const isMember = await redis.sismember(key, oldId);
+    if (!isMember) return;
+    await redis.srem(key, oldId);
+    await redis.sadd(key, newId);
+  } catch {
+    // best-effort
+  }
+}
+
 /**
  * Called when a socket disconnects.
  *
@@ -200,12 +218,33 @@ export async function handleReconnect(
         gameState.activePlayers = gameState.activePlayers.map((id) => (id === oldId ? newId : id));
         gameState.spectators = gameState.spectators.map((id) => (id === oldId ? newId : id));
         if (gameState.currentTurnPlayerId === oldId) gameState.currentTurnPlayerId = newId;
+        if (gameState.eliminatedThisRound === oldId) gameState.eliminatedThisRound = newId;
+        gameState.clueLog = gameState.clueLog.map((entry) => ({
+          ...entry,
+          playerId: entry.playerId === oldId ? newId : entry.playerId,
+        }));
         gameState.votes = gameState.votes.map((v) => ({
           ...v,
           voterId: v.voterId === oldId ? newId : v.voterId,
           targetId: v.targetId === oldId ? newId : v.targetId,
         }));
+        if (gameState.tournamentScores?.[oldId] !== undefined) {
+          gameState.tournamentScores[newId] = gameState.tournamentScores[oldId];
+          delete gameState.tournamentScores[oldId];
+        }
         await redis.set(`game:${roomCode}`, JSON.stringify(gameState), { ex: GAME_TTL });
+
+        await Promise.allSettled([
+          moveRedisValue(`role:${roomCode}:${oldId}`, `role:${roomCode}:${newId}`, GAME_TTL),
+          replaceSetMember(`ready:${roomCode}`, oldId, newId),
+          replaceSetMember(`early_vote:${roomCode}:${gameState.round}`, oldId, newId),
+          replaceSetMember(`title_voters:${roomCode}`, oldId, newId),
+        ]);
+
+        const rawSelfRevealId = await redis.get<string>(`self_reveal:${roomCode}`);
+        if (rawSelfRevealId === oldId) {
+          await redis.set(`self_reveal:${roomCode}`, newId, { ex: GAME_TTL });
+        }
       }
 
       const publicState = toPublicGameState(gameState);
@@ -228,6 +267,7 @@ export async function handleReconnect(
     // 7. Notify room
     io.to(roomCode).emit('room:player_reconnected', {
       playerId: newId,
+      previousPlayerId: oldId,
       nickname: player.nickname,
     });
   } catch (err: unknown) {

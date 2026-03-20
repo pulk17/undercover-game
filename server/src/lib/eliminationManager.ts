@@ -1,8 +1,10 @@
 import type { Server } from 'socket.io';
 import type { GameState, Room, Role } from '@undercover/shared';
 import { redis } from './redis';
+import { saveRoom } from '../managers/RoomManager';
 import { toPublicGameState, startMrWhiteGuessTimer, awardXPForGame, evaluateAchievementsForGame } from '../handlers/gameHandlers';
 import { evaluateWinCondition } from './gameEngine';
+import { awardRoomLeaderboardPoints } from './roomLeaderboardService';
 
 const GAME_TTL = 60 * 60 * 24; // 24 hours
 const MR_WHITE_GUESS_WINDOW_MS = 10_000;
@@ -35,6 +37,11 @@ export async function eliminatePlayer(
   const eliminatedPlayer = room.players.find((p) => p.id === eliminatedPlayerId);
   const eliminatedRole: Role | null = eliminatedPlayer?.role ?? null;
   const nickname: string = eliminatedPlayer?.nickname ?? eliminatedPlayerId;
+  if (eliminatedPlayer) {
+    eliminatedPlayer.isActive = false;
+  }
+  room.lastActivityAt = Date.now();
+  await saveRoom(room);
 
   // 3. Determine whether to reveal the role
   const revealRole = room.config.postEliminationReveal === true;
@@ -61,6 +68,23 @@ export async function eliminatePlayer(
     // Game over
     gameState.winner = winFaction;
     gameState.phase = 'game_over';
+
+    if (room.config.mode === 'tournament') {
+      const { awardTournamentPoints } = await import('./tournamentManager');
+      const correctVoters = gameState.votes
+        .filter((vote) => vote.targetId === eliminatedPlayerId)
+        .map((vote) => vote.voterId);
+      const tournamentState = await awardTournamentPoints(roomCode, gameState, room, correctVoters);
+      if (tournamentState) {
+        gameState.tournamentScores = { ...tournamentState.scores };
+      }
+    }
+
+    const roomLeaderboardScores = await awardRoomLeaderboardPoints(room, gameState);
+    if (room.config.mode !== 'tournament') {
+      gameState.tournamentScores = roomLeaderboardScores;
+    }
+
     await redis.set(`game:${roomCode}`, JSON.stringify(gameState), { ex: GAME_TTL });
 
     const publicState = toPublicGameState(gameState);
@@ -90,6 +114,10 @@ export async function eliminatePlayer(
     gameState.phase = 'mr_white_guess';
     gameState.phaseEndsAt = Date.now() + MR_WHITE_GUESS_WINDOW_MS;
     await redis.set(`game:${roomCode}`, JSON.stringify(gameState), { ex: GAME_TTL });
+    io.to(roomCode).emit('game:phase_changed', {
+      phase: 'mr_white_guess',
+      state: toPublicGameState(gameState),
+    });
 
     // Emit only to the eliminated player's socket
     io.to(eliminatedPlayerId).emit('game:mr_white_window', {
@@ -141,6 +169,10 @@ export async function advanceToNextRound(
     gameState.phaseEndsAt = Date.now() + 10_000;
 
     await redis.set(`game:${roomCode}`, JSON.stringify(gameState), { ex: GAME_TTL });
+    io.to(roomCode).emit('game:phase_changed', {
+      phase: 'mr_white_guess',
+      state: toPublicGameState(gameState),
+    });
 
     // Notify Mr. White's socket of their guess window
     io.to(mrWhitePlayer.id).emit('game:mr_white_window', {

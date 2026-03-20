@@ -93,12 +93,6 @@ async function handleDiscussionExpiry(roomCode: string, io: Server): Promise<voi
   // Only transition if still in discussion phase
   if (gameState.phase !== 'discussion') return;
 
-  // Transition to vote phase
-  gameState.phase = 'vote';
-  gameState.phaseEndsAt = null;
-
-  await redis.set(`game:${roomCode}`, JSON.stringify(gameState), { ex: GAME_TTL });
-
-  const publicState = toPublicGameState(gameState);
-  io.to(roomCode).emit('game:phase_changed', { phase: 'vote', state: publicState });
+  const { startVotePhase } = await import('./voteManager');
+  await startVotePhase(io, roomCode, gameState);
 }

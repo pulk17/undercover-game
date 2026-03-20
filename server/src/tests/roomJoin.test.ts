@@ -54,7 +54,7 @@ const playerArb: fc.Arbitrary<Player> = fc.record({
 
 const configArb: fc.Arbitrary<GameConfig> = fc.record({
   mode: fc.constantFrom('classic', 'speed_round', 'tournament') as fc.Arbitrary<GameConfig['mode']>,
-  category: fc.string({ minLength: 1, maxLength: 20 }),
+  categories: fc.array(fc.string({ minLength: 1, maxLength: 20 }), { minLength: 1, maxLength: 3 }),
   difficulty: fc.constantFrom('easy', 'medium', 'hard') as fc.Arbitrary<GameConfig['difficulty']>,
   clueTimerSeconds: fc.option(fc.integer({ min: 10, max: 120 }), { nil: null }),
   discussionTimerSeconds: fc.option(fc.integer({ min: 30, max: 300 }), { nil: null }),

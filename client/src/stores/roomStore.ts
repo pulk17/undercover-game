@@ -36,6 +36,7 @@ interface RoomActions {
   createRoom(config: GameConfig, passwordHash: string | null): Promise<void>;
   joinRoom(code: string, passwordHash: string | null): Promise<void>;
   leaveRoom(): Promise<void>;
+  updateRoomConfig(config: GameConfig, passwordHash?: string | null): Promise<void>;
   setRoom(room: Room | null): void;
   setPlayers(players: Player[]): void;
   reset(): void;
@@ -56,25 +57,134 @@ const initialState: RoomState = {
 
 export const useRoomStore = create<RoomStore>((set, get) => {
   // Track connection status
-  socket.on('connect', () => set({ isConnected: true }));
+  socket.on('connect', () => set({ isConnected: true, error: null }));
   socket.on('disconnect', () => set({ isConnected: false }));
+  socket.on('room:error', ({ message }: { message: string }) => set({ error: message }));
+
+  socket.on('game:state_sync', ({ players }: { players?: Player[] }) => {
+    if (!players) return;
+    set((state) => ({
+      players,
+      room: state.room ? { ...state.room, players } : state.room,
+      isHost: players.some((player) => player.id === socket.id && player.isHost),
+    }));
+  });
 
   // Persistent room event listeners
   socket.on('room:player_joined', ({ players }: { players: Player[] }) => {
-    set({ players });
+    set((state) => ({
+      players,
+      room: state.room ? { ...state.room, players } : state.room,
+      error: null,
+    }));
   });
 
   socket.on('room:player_left', ({ players }: { players: Player[] }) => {
-    set({ players });
+    set((state) => ({
+      players,
+      room: state.room ? { ...state.room, players } : state.room,
+      isHost: players.some((player) => player.id === socket.id && player.isHost),
+    }));
+  });
+
+  socket.on('room:player_disconnected', ({ playerId }: { playerId: string }) => {
+    set((state) => {
+      const players = state.players.map((player) => {
+        if (player.id === playerId) {
+          return { ...player, isConnected: false };
+        }
+        return player;
+      });
+
+      return {
+        players,
+        room: state.room ? { ...state.room, players } : state.room,
+        error: null,
+      };
+    });
+  });
+
+  socket.on('room:updated', ({ room }: { room: Room }) => {
+    set({
+      room,
+      players: room.players,
+      isHost: room.players.some((player) => player.id === socket.id && player.isHost),
+      error: null,
+    });
+  });
+
+  socket.on('room:player_reconnected', ({
+    playerId,
+    previousPlayerId,
+    nickname,
+  }: {
+    playerId: string;
+    previousPlayerId?: string;
+    nickname: string;
+  }) => {
+    set((state) => {
+      let matched = false;
+      const players = state.players.map((player) => {
+        if (
+          player.id === playerId ||
+          (previousPlayerId && player.id === previousPlayerId) ||
+          player.nickname === nickname
+        ) {
+          matched = true;
+          return { ...player, id: playerId, isConnected: true };
+        }
+        return player;
+      });
+
+      if (!matched) return state;
+
+      return {
+        players,
+        room: state.room ? { ...state.room, players } : state.room,
+        isHost: players.some((player) => player.id === socket.id && player.isHost),
+        error: null,
+      };
+    });
   });
 
   socket.on('host:transferred', ({ newHostId }: { newHostId: string }) => {
-    set({ isHost: newHostId === socket.id });
+    set((state) => {
+      const players = state.players.map((player) => ({
+        ...player,
+        isHost: player.id === newHostId,
+      }));
+      return {
+        players,
+        room: state.room
+          ? { ...state.room, hostId: newHostId, players }
+          : state.room,
+        isHost: newHostId === socket.id,
+        error: null,
+      };
+    });
   });
 
   socket.on('room:kicked', () => {
     // Kicked players are removed from the room
     get().reset();
+  });
+
+  socket.on(
+    'game:reset',
+    ({ players }: { phase: 'lobby'; players: Player[] }) => {
+      set((state) => ({
+        players,
+        room: state.room
+          ? { ...state.room, phase: 'lobby', players }
+          : state.room,
+        isHost: players.some((player) => player.id === socket.id && player.isHost),
+        error: null,
+      }));
+    },
+  );
+
+  socket.on('room:closed', ({ reason }: { reason: string }) => {
+    set({ ...initialState, error: reason });
   });
 
   return {
@@ -87,27 +197,34 @@ export const useRoomStore = create<RoomStore>((set, get) => {
         throw new Error('Server connection offline');
       }
       return new Promise<void>((resolve, reject) => {
+        const handleCreated = ({ room, qrDataUrl }: { room: Room; qrDataUrl: string }) => {
+          clearTimeout(timeout);
+          socket.off('room:error', handleError);
+          set({
+            room,
+            players: room.players,
+            isHost: room.players.some((player) => player.id === socket.id && player.isHost),
+            qrDataUrl,
+          });
+          resolve();
+        };
+
+        const handleError = ({ message }: { message: string }) => {
+          clearTimeout(timeout);
+          socket.off('room:created', handleCreated);
+          set({ error: message });
+          reject(new Error(message));
+        };
+
         const timeout = setTimeout(() => {
-          socket.off('room:created');
-          socket.off('room:error');
+          socket.off('room:created', handleCreated);
+          socket.off('room:error', handleError);
           set({ error: 'Room creation timed out' });
           reject(new Error('Room creation timed out'));
         }, 10000);
 
-        socket.once(
-          'room:created',
-          ({ room, qrDataUrl }: { room: Room; qrDataUrl: string }) => {
-            clearTimeout(timeout);
-            set({ room, players: room.players, isHost: true, qrDataUrl });
-            resolve();
-          },
-        );
-
-        socket.once('room:error', ({ message }: { message: string }) => {
-          clearTimeout(timeout);
-          set({ error: message });
-          reject(new Error(message));
-        });
+        socket.once('room:created', handleCreated);
+        socket.once('room:error', handleError);
 
         socket.emit('room:create', { config, passwordHash });
       });
@@ -120,24 +237,33 @@ export const useRoomStore = create<RoomStore>((set, get) => {
         throw new Error('Server connection offline');
       }
       return new Promise<void>((resolve, reject) => {
+        const handleJoined = ({ room }: { room: Room }) => {
+          clearTimeout(timeout);
+          socket.off('room:error', handleError);
+          set({
+            room,
+            players: room.players,
+            isHost: room.players.some((player) => player.id === socket.id && player.isHost),
+          });
+          resolve();
+        };
+
+        const handleError = ({ message }: { message: string }) => {
+          clearTimeout(timeout);
+          socket.off('room:joined', handleJoined);
+          set({ error: message });
+          reject(new Error(message));
+        };
+
         const timeout = setTimeout(() => {
-          socket.off('room:joined');
-          socket.off('room:error');
+          socket.off('room:joined', handleJoined);
+          socket.off('room:error', handleError);
           set({ error: 'Join room timed out' });
           reject(new Error('Join room timed out'));
         }, 10000);
 
-        socket.once('room:joined', ({ room }: { room: Room }) => {
-          clearTimeout(timeout);
-          set({ room, players: room.players, isHost: false });
-          resolve();
-        });
-
-        socket.once('room:error', ({ message }: { message: string }) => {
-          clearTimeout(timeout);
-          set({ error: message });
-          reject(new Error(message));
-        });
+        socket.once('room:joined', handleJoined);
+        socket.once('room:error', handleError);
 
         socket.emit('room:join', { code, passwordHash });
       });
@@ -154,8 +280,46 @@ export const useRoomStore = create<RoomStore>((set, get) => {
       });
     },
 
+    async updateRoomConfig(config: GameConfig, passwordHash?: string | null) {
+      set({ error: null });
+      return new Promise<void>((resolve, reject) => {
+        const handleUpdated = ({ room }: { room: Room }) => {
+          clearTimeout(timeout);
+          socket.off('room:error', handleError);
+          set({
+            room,
+            players: room.players,
+            isHost: room.players.some((player) => player.id === socket.id && player.isHost),
+          });
+          resolve();
+        };
+
+        const handleError = ({ message }: { message: string }) => {
+          clearTimeout(timeout);
+          socket.off('room:updated', handleUpdated);
+          set({ error: message });
+          reject(new Error(message));
+        };
+
+        const timeout = setTimeout(() => {
+          socket.off('room:updated', handleUpdated);
+          socket.off('room:error', handleError);
+          reject(new Error('Room update timed out'));
+        }, 10000);
+
+        socket.once('room:updated', handleUpdated);
+        socket.once('room:error', handleError);
+
+        socket.emit('room:update_config', { config, passwordHash });
+      });
+    },
+
     setRoom(room: Room | null) {
-      set({ room, players: room?.players ?? [] });
+      set({
+        room,
+        players: room?.players ?? [],
+        isHost: room?.players.some((player) => player.id === socket.id && player.isHost) ?? false,
+      });
     },
 
     setPlayers(players: Player[]) {

@@ -15,6 +15,48 @@ const googleBodySchema = z.object({
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 const THIRTY_DAYS_S = 30 * 24 * 60 * 60;
 
+function defaultPreferences() {
+  return {
+    language: 'en',
+    notifications: true,
+    hapticEnabled: true,
+    textScale: 'medium' as const,
+  };
+}
+
+function toAuthUser(
+  payload: {
+    uid: string;
+    email?: string | null;
+    displayName?: string | null;
+    photoURL?: string | null;
+    isGuest?: boolean;
+  },
+  firestoreData?: FirebaseFirestore.DocumentData,
+) {
+  const data = firestoreData ?? {};
+  const displayName = (data.displayName as string | null | undefined) ?? payload.displayName ?? 'Guest';
+
+  return {
+    uid: payload.uid,
+    email: payload.email ?? null,
+    displayName,
+    avatarUrl: (data.photoURL as string | null | undefined) ?? payload.photoURL ?? null,
+    photoURL: (data.photoURL as string | null | undefined) ?? payload.photoURL ?? null,
+    nickname: (data.nickname as string | null | undefined) ?? displayName,
+    xp: (data.xp as number | undefined) ?? 0,
+    level: (data.level as string | undefined) ?? 'rookie',
+    achievements: (data.achievements as string[] | undefined) ?? [],
+    purchasedPacks: (data.purchasedPacks as string[] | undefined) ?? [],
+    friends: (data.friends as string[] | undefined) ?? [],
+    preferences: {
+      ...defaultPreferences(),
+      ...((data.preferences as Record<string, unknown> | undefined) ?? {}),
+    },
+    isGuest: payload.isGuest ?? false,
+  };
+}
+
 authRouter.post('/google', async (req: Request, res: Response) => {
   const parsed = googleBodySchema.safeParse(req.body);
   if (!parsed.success) {
@@ -47,6 +89,7 @@ authRouter.post('/google', async (req: Request, res: Response) => {
       uid,
       email: email ?? null,
       displayName: displayName ?? null,
+      nickname: displayName ?? null,
       photoURL: photoURL ?? null,
       isGuest: false,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -54,8 +97,10 @@ authRouter.post('/google', async (req: Request, res: Response) => {
       level: initialLevel,
       xp: 0,
       achievements: [],
+      purchasedPacks: [],
+      friends: [],
       stats: { gamesPlayed: 0, wins: 0, losses: 0 },
-      preferences: { language: 'en', notifications: true },
+      preferences: defaultPreferences(),
     });
   } else {
     await userRef.set(
@@ -82,7 +127,8 @@ authRouter.post('/google', async (req: Request, res: Response) => {
     path: '/',
   });
 
-  res.json({ data: { uid, email: email ?? null, displayName: displayName ?? null, photoURL: photoURL ?? null }, error: null });
+  const finalSnap = await userRef.get();
+  res.json({ data: toAuthUser(payload, finalSnap.data()), error: null });
 });
 
 const GUEST_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
@@ -117,7 +163,18 @@ authRouter.post('/guest', (_req: Request, res: Response) => {
     path: '/',
   });
 
-  res.json({ data: { uid, displayName }, error: null });
+  res.json({
+    data: toAuthUser(payload, {
+      nickname: displayName,
+      xp: 0,
+      level: 'rookie',
+      achievements: [],
+      purchasedPacks: [],
+      friends: [],
+      preferences: defaultPreferences(),
+    }),
+    error: null,
+  });
 });
 
 authRouter.post('/logout', (_req: Request, res: Response) => {
@@ -146,12 +203,26 @@ authRouter.get('/me', async (req: Request, res: Response) => {
     const docSnap = await adminFirestore.collection('users').doc(uid).get();
     if (!docSnap.exists) {
       // Guest or user not yet in Firestore — return JWT payload data directly
-      res.json({ data: { uid, email, displayName, photoURL, isGuest }, error: null });
+      res.json({
+        data: toAuthUser(
+          { uid, email, displayName, photoURL, isGuest },
+          {
+            nickname: displayName,
+            xp: 0,
+            level: 'rookie',
+            achievements: [],
+            purchasedPacks: [],
+            friends: [],
+            preferences: defaultPreferences(),
+          },
+        ),
+        error: null,
+      });
       return;
     }
 
     const firestoreData = docSnap.data() ?? {};
-    res.json({ data: { uid, email, displayName, photoURL, isGuest, ...firestoreData }, error: null });
+    res.json({ data: toAuthUser({ uid, email, displayName, photoURL, isGuest }, firestoreData), error: null });
   } catch {
     res.status(500).json({ data: null, error: { message: 'Failed to fetch user profile' } });
   }

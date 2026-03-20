@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useRoomStore } from '../stores/roomStore';
 import { env } from '../env';
-import type { GameConfig, GameMode, Difficulty } from '../../../shared/types';
+import type { Difficulty, GameConfig, GameMode } from '../../../shared/types';
 
 const defaultConfig: GameConfig = {
   mode: 'classic',
@@ -15,452 +15,628 @@ const defaultConfig: GameConfig = {
   postEliminationReveal: true,
   detectiveEnabled: false,
   silentRoundEnabled: false,
-  maxPlayers: 8,
   customWordPair: null,
+  maxPlayers: 8,
 };
+
+const MODE_OPTIONS: Array<{
+  value: GameMode;
+  label: string;
+  badge: string;
+  desc: string;
+}> = [
+  { value: 'classic', label: 'Classic', badge: 'C', desc: 'Standard rules and pacing' },
+  { value: 'speed_round', label: 'Speed', badge: 'SR', desc: 'Short timers and fast rounds' },
+  { value: 'secret_alliance', label: 'Alliance', badge: 'SA', desc: 'Two allied undercover players' },
+  { value: 'double_agent', label: 'Double Agent', badge: 'DA', desc: 'Two undercover players' },
+  { value: 'reverse_mode', label: 'Reverse', badge: 'RV', desc: 'Undercover majority mode' },
+  { value: 'mr_white_army', label: 'White Army', badge: 'MW', desc: 'Multiple Mr. Whites' },
+  { value: 'tournament', label: 'Tournament', badge: 'T', desc: 'Carry points across rematches' },
+];
+
+const CATEGORY_ICONS: Record<string, string> = {
+  general: 'GEN',
+  food: 'FOOD',
+  travel: 'TRVL',
+  cinema: 'MOV',
+  sports: 'SPRT',
+  tech: 'TECH',
+  nature: 'NAT',
+  music: 'MUS',
+  history: 'HIS',
+  science: 'SCI',
+};
+
+const FALLBACK_CATEGORIES = ['general', 'food', 'travel', 'cinema', 'sports', 'tech'];
+const DIFFICULTIES: Array<{ value: Difficulty; label: string; color: string }> = [
+  { value: 'easy', label: 'Easy', color: '#3ecfb0' },
+  { value: 'medium', label: 'Medium', color: '#e8c547' },
+  { value: 'hard', label: 'Hard', color: '#e84b4b' },
+];
+const CLUE_TIMERS = [30, 60, 90];
+const DISCUSSION_TIMERS = [60, 120, 180];
 
 async function hashPassword(password: string): Promise<string | null> {
   if (!password) return null;
-  if (!crypto.subtle) return null;
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+  if (!crypto?.subtle) {
+    throw new Error('Secure password hashing is unavailable in this browser.');
+  }
+
+  const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(password));
+  return Array.from(new Uint8Array(hashBuffer))
+    .map((value) => value.toString(16).padStart(2, '0'))
+    .join('');
 }
-
-const MODES: { value: GameMode; label: string; icon: string; desc: string }[] = [
-  { value: 'classic', label: 'CLASSIC', icon: '◎', desc: 'Standard rules' },
-  { value: 'speed_round', label: 'SPEED', icon: '⚡', desc: 'Short timers' },
-  { value: 'double_agent', label: 'DOUBLE', icon: '◈', desc: '2 undercovers' },
-  { value: 'reverse_mode', label: 'REVERSE', icon: '↺', desc: 'Undercover knows' },
-];
-
-const FALLBACK_CATEGORIES = ['general', 'food', 'travel', 'cinema', 'sports', 'tech'];
-
-const CATEGORY_ICONS: Record<string, string> = {
-  general: '🌐',
-  food: '🍕',
-  travel: '✈️',
-  cinema: '🎬',
-  sports: '⚽',
-  tech: '💻',
-  nature: '🌿',
-  music: '🎵',
-  history: '📜',
-  science: '🔬',
-};
-
-const DIFFICULTIES: { value: Difficulty; color: string; label: string }[] = [
-  { value: 'easy', color: '#3ecfb0', label: 'EASY' },
-  { value: 'medium', color: '#e8c547', label: 'MEDIUM' },
-  { value: 'hard', color: '#e84b4b', label: 'HARD' },
-];
-
-const TIMER_OPTIONS = [30, 60, 90];
 
 function SectionLabel({ children }: { children: string }) {
   return (
-    <p style={{
-      fontFamily: 'IBM Plex Mono, monospace',
-      fontSize: 10,
-      letterSpacing: '0.2em',
-      color: '#4a5068',
-      textTransform: 'uppercase',
-      marginBottom: 12,
-    }}>
+    <p
+      style={{
+        fontFamily: 'IBM Plex Mono, monospace',
+        fontSize: 10,
+        letterSpacing: '0.18em',
+        color: '#4a5068',
+        textTransform: 'uppercase',
+        margin: '0 0 10px',
+      }}
+    >
       {children}
     </p>
   );
 }
 
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+function Toggle({ checked, onChange }: { checked: boolean; onChange: (value: boolean) => void }) {
   return (
-    <div
+    <button
+      type="button"
       className={checked ? 'toggle-on' : 'toggle-off'}
       onClick={() => onChange(!checked)}
-      style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-      role="switch"
-      aria-checked={checked}
+      style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+      aria-pressed={checked}
     >
       <div className="toggle-track">
         <div className="toggle-thumb" />
       </div>
-    </div>
+    </button>
   );
 }
 
 export default function CreateRoomScreen() {
   const navigate = useNavigate();
-  const { createRoom, error, isConnected } = useRoomStore();
+  const [searchParams] = useSearchParams();
+  const { createRoom, updateRoomConfig, room, error, isConnected } = useRoomStore();
 
+  const isEditing = searchParams.get('edit') === '1' && Boolean(room);
   const [config, setConfig] = useState<GameConfig>(defaultConfig);
   const [password, setPassword] = useState('');
   const [clueUnlimited, setClueUnlimited] = useState(false);
   const [discussionUnlimited, setDiscussionUnlimited] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
   const [categories, setCategories] = useState<string[]>(FALLBACK_CATEGORIES);
+  const [submitting, setSubmitting] = useState(false);
+  const [submissionError, setSubmissionError] = useState('');
 
-  // Fetch categories from the server
   useEffect(() => {
-    fetch(`${env.VITE_API_BASE_URL}/words/categories`, { credentials: 'include' })
-      .then((r) => r.json())
-      .then((body) => {
-        if (body.data && Array.isArray(body.data) && body.data.length > 0) {
-          setCategories(body.data);
-          // Reset selected categories to first available if current selection is invalid
-          setConfig((prev) => ({
-            ...prev,
-            categories: prev.categories.filter((c) => body.data.includes(c)).length > 0
-              ? prev.categories.filter((c) => body.data.includes(c))
-              : [body.data[0]],
-          }));
-        }
+    const controller = new AbortController();
+
+    fetch(`${env.VITE_API_BASE_URL}/words/categories`, { credentials: 'include', signal: controller.signal })
+      .then((response) => response.json())
+      .then((payload) => {
+        if (!Array.isArray(payload.data) || payload.data.length === 0) return;
+
+        setCategories(payload.data);
+        setConfig((previous) => {
+          const nextCategories = previous.categories.filter((value) => payload.data.includes(value));
+          return {
+            ...previous,
+            categories: nextCategories.length > 0 ? nextCategories : [payload.data[0]],
+          };
+        });
       })
-      .catch(() => {/* keep fallback */});
+      .catch(() => {
+        // Keep fallback categories when the API is unavailable.
+      });
+
+    return () => controller.abort();
   }, []);
 
+  useEffect(() => {
+    if (!isEditing || !room) return;
+
+    setConfig(room.config);
+    setClueUnlimited(room.config.clueTimerSeconds === null);
+    setDiscussionUnlimited(room.config.discussionTimerSeconds === null);
+  }, [isEditing, room]);
+
+  const submitLabel = useMemo(() => {
+    if (submitting) {
+      return isEditing ? 'Saving...' : 'Creating...';
+    }
+    if (!isConnected) {
+      return 'Connecting...';
+    }
+    return isEditing ? 'Save Settings' : 'Start Lobby';
+  }, [isConnected, isEditing, submitting]);
+
   function setField<K extends keyof GameConfig>(key: K, value: GameConfig[K]) {
-    setConfig((prev) => ({ ...prev, [key]: value }));
+    setConfig((previous) => ({ ...previous, [key]: value }));
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    setSubmissionError('');
     if (!isConnected) {
-      alert('Not connected to server. Please check your connection and try again.');
+      setSubmissionError('The server is still reconnecting. Please try again in a moment.');
       return;
     }
+
     setSubmitting(true);
     try {
-      const finalConfig: GameConfig = {
+      const passwordHash = password ? await hashPassword(password) : null;
+      const nextConfig: GameConfig = {
         ...config,
         clueTimerSeconds: clueUnlimited ? null : config.clueTimerSeconds,
         discussionTimerSeconds: discussionUnlimited ? null : config.discussionTimerSeconds,
       };
-      const passwordHash = password ? await hashPassword(password) : null;
-      await createRoom(finalConfig, passwordHash);
+
+      if (isEditing) {
+        await updateRoomConfig(nextConfig, password ? passwordHash : undefined);
+      } else {
+        await createRoom(nextConfig, passwordHash);
+      }
+
       navigate('/lobby');
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to create room';
-      alert(msg);
+    } catch (caught) {
+      setSubmissionError(caught instanceof Error ? caught.message : 'Unable to save room settings');
     } finally {
       setSubmitting(false);
     }
   }
 
+  function toggleCategory(category: string) {
+    const isActive = config.categories.includes(category);
+    if (isActive && config.categories.length === 1) return;
+
+    setField(
+      'categories',
+      isActive
+        ? config.categories.filter((value) => value !== category)
+        : [...config.categories, category],
+    );
+  }
+
   return (
-    <div style={{ minHeight: '100vh', background: '#08090d', color: '#e3e2e8', paddingBottom: 100 }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '24px 20px 0', marginBottom: 8 }}>
-        <div>
-          <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, color: '#4a5068', letterSpacing: '0.15em', margin: '0 0 4px' }}>
-            SEC-R812-B
+    <div style={{ minHeight: '100vh', background: '#000', color: '#e3e2e8', paddingBottom: 100 }}>
+      <div
+        style={{
+          padding: '24px 20px 0',
+          display: 'flex',
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+          gap: 16,
+        }}
+      >
+        <div style={{ minWidth: 0 }}>
+          <p
+            style={{
+              fontFamily: 'IBM Plex Mono, monospace',
+              fontSize: 10,
+              color: '#4a5068',
+              letterSpacing: '0.16em',
+              margin: '0 0 6px',
+              textTransform: 'uppercase',
+            }}
+          >
+            Control Panel
           </p>
-          <h1 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 22, margin: 0, letterSpacing: '-0.01em' }}>
-            NEW ROOM
+          <h1
+            style={{
+              fontFamily: 'Syne, sans-serif',
+              fontWeight: 800,
+              fontSize: 24,
+              lineHeight: 1.05,
+              margin: 0,
+              letterSpacing: '-0.02em',
+            }}
+          >
+            {isEditing ? 'Party Settings' : 'Create Room'}
           </h1>
         </div>
+
         <button
+          type="button"
           onClick={() => navigate(-1)}
-          style={{ background: 'none', border: 'none', color: '#8c8a85', fontSize: 20, cursor: 'pointer', padding: 4, lineHeight: 1 }}
-          aria-label="Close"
+          style={{
+            background: 'none',
+            border: 'none',
+            color: '#8c8a85',
+            fontFamily: 'IBM Plex Mono, monospace',
+            fontSize: 12,
+            letterSpacing: '0.1em',
+            cursor: 'pointer',
+            padding: '6px 0',
+            flexShrink: 0,
+          }}
         >
-          ✕
+          CLOSE
         </button>
       </div>
 
-      {/* Connection warning */}
       {!isConnected && (
-        <div style={{ margin: '8px 20px', padding: '10px 14px', background: 'rgba(232,75,75,0.1)', border: '1px solid rgba(232,75,75,0.3)', borderRadius: 10 }}>
-          <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 11, color: '#e84b4b', margin: 0, letterSpacing: '0.05em' }}>
-            ⚠ NOT CONNECTED — Reconnecting to server…
+        <div
+          style={{
+            margin: '14px 20px 0',
+            background: 'rgba(232,75,75,0.08)',
+            border: '1px solid rgba(232,75,75,0.24)',
+            borderRadius: 12,
+            padding: '12px 14px',
+          }}
+        >
+          <p
+            style={{
+              fontFamily: 'IBM Plex Mono, monospace',
+              fontSize: 11,
+              color: '#e84b4b',
+              margin: 0,
+              letterSpacing: '0.06em',
+            }}
+          >
+            Not connected. Waiting for the server to come back.
           </p>
         </div>
       )}
 
-      <form onSubmit={handleSubmit} style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 28 }}>
-
-        {/* Game Mode */}
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <SectionLabel>GAME MODE</SectionLabel>
-            <span style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, color: '#e8c547', letterSpacing: '0.1em' }}>SELECT_ONE</span>
-          </div>
-          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
-            {MODES.map((m) => {
-              const active = config.mode === m.value;
+      <form onSubmit={handleSubmit} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: 24 }}>
+        <motion.section initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+          <SectionLabel>Game Mode</SectionLabel>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
+            {MODE_OPTIONS.map((mode) => {
+              const active = config.mode === mode.value;
               return (
                 <button
-                  key={m.value}
+                  key={mode.value}
                   type="button"
-                  onClick={() => setField('mode', m.value)}
+                  onClick={() => setField('mode', mode.value)}
                   style={{
-                    minWidth: 80,
-                    height: 80,
-                    background: active ? 'rgba(232,197,71,0.08)' : '#12141c',
+                    minHeight: 94,
+                    background: active ? 'rgba(232,197,71,0.09)' : '#12141c',
                     border: `1px solid ${active ? '#e8c547' : 'rgba(255,255,255,0.07)'}`,
-                    borderRadius: 12,
+                    borderRadius: 14,
+                    padding: '14px 12px',
+                    textAlign: 'left',
+                    cursor: 'pointer',
                     display: 'flex',
                     flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 4,
-                    cursor: 'pointer',
-                    transition: 'all 150ms ease',
-                    flexShrink: 0,
-                    padding: '8px 6px',
+                    gap: 8,
+                    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)',
                   }}
                 >
-                  <span style={{ fontSize: 18, color: active ? '#e8c547' : '#8c8a85' }}>{m.icon}</span>
-                  <span style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 9, letterSpacing: '0.1em', color: active ? '#e8c547' : '#8c8a85' }}>
-                    {m.label}
-                  </span>
-                  <span style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 8, color: active ? 'rgba(232,197,71,0.6)' : '#4a5068', textAlign: 'center' }}>
-                    {m.desc}
-                  </span>
+                  <div
+                    style={{
+                      width: 34,
+                      height: 34,
+                      borderRadius: 10,
+                      background: active ? '#e8c547' : 'rgba(255,255,255,0.06)',
+                      color: active ? '#000' : '#8c8a85',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontFamily: 'IBM Plex Mono, monospace',
+                      fontSize: 11,
+                      letterSpacing: '0.08em',
+                    }}
+                  >
+                    {mode.badge}
+                  </div>
+                  <div>
+                    <p style={{ fontFamily: 'Syne, sans-serif', fontSize: 15, color: '#e3e2e8', margin: '0 0 4px' }}>
+                      {mode.label}
+                    </p>
+                    <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, color: active ? '#c8b466' : '#4a5068', margin: 0, lineHeight: 1.5 }}>
+                      {mode.desc}
+                    </p>
+                  </div>
                 </button>
               );
             })}
           </div>
-        </motion.div>
+        </motion.section>
 
-        {/* Word Category */}
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <SectionLabel>WORD CATEGORY</SectionLabel>
-            <span style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, color: '#3ecfb0', letterSpacing: '0.1em' }}>
-              {config.categories.length} SELECTED
-            </span>
-          </div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {categories.map((cat) => {
-              const active = config.categories.includes(cat);
-              const icon = CATEGORY_ICONS[cat] ?? '🎯';
+        <motion.section initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.04 }}>
+          <SectionLabel>Categories</SectionLabel>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {categories.map((category) => {
+              const active = config.categories.includes(category);
               return (
                 <button
-                  key={cat}
+                  key={category}
                   type="button"
-                  onClick={() => {
-                    const isLast = config.categories.length === 1;
-                    if (active && isLast) return;
-                    const next = active
-                      ? config.categories.filter((c) => c !== cat)
-                      : [...config.categories, cat];
-                    setField('categories', next);
-                  }}
+                  onClick={() => toggleCategory(category)}
                   style={{
-                    minWidth: 80,
-                    height: 72,
+                    minWidth: 92,
+                    height: 56,
                     background: active ? 'rgba(62,207,176,0.08)' : '#12141c',
                     border: `1px solid ${active ? '#3ecfb0' : 'rgba(255,255,255,0.07)'}`,
                     borderRadius: 12,
+                    padding: '0 12px',
+                    cursor: 'pointer',
                     display: 'flex',
-                    flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: 4,
-                    cursor: 'pointer',
-                    transition: 'all 150ms ease',
-                    flexShrink: 0,
+                    gap: 8,
                   }}
                 >
-                  <span style={{ fontSize: 16 }}>{icon}</span>
-                  <span style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 9, letterSpacing: '0.1em', color: active ? '#3ecfb0' : '#8c8a85', textTransform: 'uppercase' }}>
-                    {cat}
+                  <span style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 9, color: active ? '#3ecfb0' : '#4a5068', letterSpacing: '0.08em' }}>
+                    {CATEGORY_ICONS[category] ?? 'CAT'}
+                  </span>
+                  <span style={{ fontFamily: 'Syne, sans-serif', fontSize: 13, color: active ? '#e3e2e8' : '#8c8a85' }}>
+                    {category}
                   </span>
                 </button>
               );
             })}
           </div>
-        </motion.div>
+        </motion.section>
 
-        {/* Difficulty */}
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
-          <SectionLabel>DIFFICULTY</SectionLabel>
-          <div style={{ display: 'flex', background: '#12141c', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: 4, gap: 4 }}>
-            {DIFFICULTIES.map((d) => {
-              const active = config.difficulty === d.value;
+        <motion.section initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }}>
+          <SectionLabel>Difficulty</SectionLabel>
+          <div style={{ display: 'flex', gap: 8, background: '#12141c', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: 4 }}>
+            {DIFFICULTIES.map((difficulty) => {
+              const active = config.difficulty === difficulty.value;
               return (
                 <button
-                  key={d.value}
+                  key={difficulty.value}
                   type="button"
-                  onClick={() => setField('difficulty', d.value)}
+                  onClick={() => setField('difficulty', difficulty.value)}
                   style={{
                     flex: 1,
                     height: 40,
-                    background: active ? d.color : 'transparent',
                     border: 'none',
-                    borderRadius: 8,
+                    borderRadius: 10,
+                    cursor: 'pointer',
+                    background: active ? difficulty.color : 'transparent',
+                    color: active ? '#000' : '#8c8a85',
                     fontFamily: 'IBM Plex Mono, monospace',
                     fontSize: 11,
-                    fontWeight: 600,
-                    letterSpacing: '0.1em',
-                    color: active ? '#000' : '#8c8a85',
-                    cursor: 'pointer',
+                    letterSpacing: '0.08em',
                     textTransform: 'uppercase',
-                    transition: 'all 150ms ease',
                   }}
                 >
-                  {d.label}
+                  {difficulty.label}
                 </button>
               );
             })}
           </div>
-        </motion.div>
+        </motion.section>
 
-        {/* Directives */}
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-          <SectionLabel>DIRECTIVES</SectionLabel>
+        <motion.section initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }}>
+          <SectionLabel>Timers</SectionLabel>
           <div style={{ background: '#12141c', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, overflow: 'hidden' }}>
-            {/* Clue Timer */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', height: 52, borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-              <span style={{ fontFamily: 'Syne, sans-serif', fontSize: 14, color: '#e3e2e8' }}>Clue Timer</span>
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                {clueUnlimited ? (
-                  <span style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, color: '#3ecfb0' }}>∞ Unlimited</span>
-                ) : (
-                  TIMER_OPTIONS.map((t) => (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => setField('clueTimerSeconds', t)}
-                      style={{
-                        fontFamily: 'IBM Plex Mono, monospace',
-                        fontSize: 10,
-                        color: config.clueTimerSeconds === t ? '#000' : '#8c8a85',
-                        background: config.clueTimerSeconds === t ? '#3ecfb0' : 'transparent',
-                        border: `1px solid ${config.clueTimerSeconds === t ? '#3ecfb0' : 'rgba(255,255,255,0.1)'}`,
-                        borderRadius: 6,
-                        padding: '4px 8px',
-                        cursor: 'pointer',
-                        transition: 'all 150ms ease',
-                      }}
-                    >
-                      {t}s
-                    </button>
-                  ))
-                )}
-                <button type="button" onClick={() => setClueUnlimited(v => !v)} style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, color: '#4a5068', background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px' }}>
-                  {clueUnlimited ? '⏱' : '∞'}
-                </button>
-              </div>
-            </div>
-
-            {/* Discussion Timer */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', height: 52, borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-              <span style={{ fontFamily: 'Syne, sans-serif', fontSize: 14, color: '#e3e2e8' }}>Discussion Timer</span>
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                {discussionUnlimited ? (
-                  <span style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, color: '#3ecfb0' }}>∞ Unlimited</span>
-                ) : (
-                  [60, 120, 180].map((t) => (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => setField('discussionTimerSeconds', t)}
-                      style={{
-                        fontFamily: 'IBM Plex Mono, monospace',
-                        fontSize: 10,
-                        color: config.discussionTimerSeconds === t ? '#000' : '#8c8a85',
-                        background: config.discussionTimerSeconds === t ? '#e8c547' : 'transparent',
-                        border: `1px solid ${config.discussionTimerSeconds === t ? '#e8c547' : 'rgba(255,255,255,0.1)'}`,
-                        borderRadius: 6,
-                        padding: '4px 8px',
-                        cursor: 'pointer',
-                        transition: 'all 150ms ease',
-                      }}
-                    >
-                      {t}s
-                    </button>
-                  ))
-                )}
-                <button type="button" onClick={() => setDiscussionUnlimited(v => !v)} style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, color: '#4a5068', background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px' }}>
-                  {discussionUnlimited ? '⏱' : '∞'}
-                </button>
-              </div>
-            </div>
-
-            {/* Post-elimination reveal */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', height: 52, borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-              <span style={{ fontFamily: 'Syne, sans-serif', fontSize: 14, color: '#e3e2e8' }}>Reveal Role After Elim</span>
-              <Toggle checked={config.postEliminationReveal} onChange={(v) => setField('postEliminationReveal', v)} />
-            </div>
-
-            {/* Detective */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', height: 52, borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-              <span style={{ fontFamily: 'Syne, sans-serif', fontSize: 14, color: '#e3e2e8' }}>Detective Mode</span>
-              <Toggle checked={config.detectiveEnabled} onChange={(v) => setField('detectiveEnabled', v)} />
-            </div>
-
-            {/* Silent round */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', height: 52 }}>
-              <span style={{ fontFamily: 'Syne, sans-serif', fontSize: 14, color: '#e3e2e8' }}>Silent Round</span>
-              <Toggle checked={config.silentRoundEnabled} onChange={(v) => setField('silentRoundEnabled', v)} />
-            </div>
+            <TimerRow
+              label="Clue Timer"
+              options={CLUE_TIMERS}
+              selected={config.clueTimerSeconds}
+              unlimited={clueUnlimited}
+              accent="#3ecfb0"
+              onSelect={(value) => setField('clueTimerSeconds', value)}
+              onToggleUnlimited={() => setClueUnlimited((value) => !value)}
+            />
+            <TimerRow
+              label="Discussion Timer"
+              options={DISCUSSION_TIMERS}
+              selected={config.discussionTimerSeconds}
+              unlimited={discussionUnlimited}
+              accent="#e8c547"
+              onSelect={(value) => setField('discussionTimerSeconds', value)}
+              onToggleUnlimited={() => setDiscussionUnlimited((value) => !value)}
+            />
           </div>
-        </motion.div>
+        </motion.section>
 
-        {/* Capacity + Password */}
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} style={{ display: 'flex', gap: 12 }}>
-          <div style={{ flex: 1, background: '#12141c', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: '14px 16px' }}>
-            <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 9, letterSpacing: '0.15em', color: '#4a5068', textTransform: 'uppercase', margin: '0 0 6px' }}>CAPACITY</p>
-            <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 22, color: '#e3e2e8', margin: '0 0 2px' }}>
-              3 – {config.maxPlayers}
+        <motion.section initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.16 }}>
+          <SectionLabel>Rules</SectionLabel>
+          <div style={{ background: '#12141c', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, overflow: 'hidden' }}>
+            <ToggleRow label="Reveal role after elimination" checked={config.postEliminationReveal} onChange={(value) => setField('postEliminationReveal', value)} />
+            <ToggleRow label="Detective mode" checked={config.detectiveEnabled} onChange={(value) => setField('detectiveEnabled', value)} />
+            <ToggleRow label="Silent round" checked={config.silentRoundEnabled} onChange={(value) => setField('silentRoundEnabled', value)} />
+          </div>
+        </motion.section>
+
+        <motion.section initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div style={{ background: '#12141c', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: '14px 16px' }}>
+            <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 9, color: '#4a5068', margin: '0 0 6px', letterSpacing: '0.14em', textTransform: 'uppercase' }}>
+              Player Cap
             </p>
-            <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, color: '#8c8a85', margin: 0 }}>PLAYERS</p>
-          </div>
-          <div style={{ flex: 1, background: '#12141c', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: '14px 16px' }}>
-            <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 9, letterSpacing: '0.15em', color: '#4a5068', textTransform: 'uppercase', margin: '0 0 6px' }}>MAX PLAYERS</p>
             <input
               type="number"
               min={3}
               max={12}
               value={config.maxPlayers}
-              onChange={(e) => setField('maxPlayers', Math.min(12, Math.max(3, Number(e.target.value))))}
-              style={{ background: 'transparent', border: 'none', fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 22, color: '#e8c547', width: '100%', outline: 'none', padding: 0 }}
+              onChange={(event) => setField('maxPlayers', Math.max(3, Math.min(12, Number(event.target.value) || 3)))}
+              style={{
+                width: '100%',
+                background: 'transparent',
+                border: 'none',
+                padding: 0,
+                fontFamily: 'Syne, sans-serif',
+                fontWeight: 800,
+                fontSize: 24,
+                color: '#e8c547',
+                outline: 'none',
+              }}
             />
+            <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, color: '#8c8a85', margin: '4px 0 0' }}>
+              3 to 12 players
+            </p>
           </div>
-        </motion.div>
 
-        {/* Optional password */}
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-          <SectionLabel>ROOM PASSWORD (OPTIONAL)</SectionLabel>
+          <div style={{ background: '#12141c', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: '14px 16px' }}>
+            <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 9, color: '#4a5068', margin: '0 0 6px', letterSpacing: '0.14em', textTransform: 'uppercase' }}>
+              Tie Rule
+            </p>
+            <select
+              value={config.tieResolution}
+              onChange={(event) => setField('tieResolution', event.target.value as GameConfig['tieResolution'])}
+              style={{
+                width: '100%',
+                height: 40,
+                background: '#0d0f17',
+                border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: 10,
+                color: '#e3e2e8',
+                padding: '0 10px',
+                fontFamily: 'IBM Plex Mono, monospace',
+                fontSize: 11,
+                outline: 'none',
+              }}
+            >
+              <option value="re_vote">Re-vote</option>
+              <option value="random">Random</option>
+              <option value="all_survive">No elimination</option>
+            </select>
+          </div>
+        </motion.section>
+
+        <motion.section initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.24 }}>
+          <SectionLabel>Room Password</SectionLabel>
           <input
             type="password"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Leave blank for open room"
+            onChange={(event) => setPassword(event.target.value)}
+            placeholder="Optional"
             style={{
               width: '100%',
-              height: 48,
-              background: '#12141c',
-              border: '1px solid rgba(255,255,255,0.07)',
+              height: 50,
               borderRadius: 12,
-              padding: '0 16px',
+              border: '1px solid rgba(255,255,255,0.07)',
+              background: '#12141c',
+              color: '#e3e2e8',
+              padding: '0 14px',
               fontFamily: 'IBM Plex Mono, monospace',
               fontSize: 13,
-              color: '#e3e2e8',
               outline: 'none',
-              boxSizing: 'border-box',
             }}
-            onFocus={(e) => { e.currentTarget.style.borderColor = '#e8c547'; }}
-            onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'; }}
           />
-        </motion.div>
+        </motion.section>
 
-        {error && (
-          <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 12, color: '#e84b4b', margin: 0 }}>{error}</p>
+        {(submissionError || error) && (
+          <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 11, color: '#e84b4b', margin: 0 }}>
+            {submissionError || error}
+          </p>
         )}
 
-        <button
-          type="submit"
-          disabled={submitting || !isConnected}
-          className="btn-primary"
-          style={{ height: 56, fontSize: 15 }}
-        >
-          {submitting ? 'CREATING…' : !isConnected ? 'CONNECTING…' : 'START LOBBY →'}
+        <button type="submit" className="btn-primary" disabled={submitting || !isConnected} style={{ height: 56 }}>
+          {submitLabel}
         </button>
       </form>
+    </div>
+  );
+}
+
+function ToggleRow({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  return (
+    <div
+      style={{
+        minHeight: 54,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 12,
+        padding: '0 16px',
+        borderBottom: '1px solid rgba(255,255,255,0.04)',
+      }}
+    >
+      <span style={{ fontFamily: 'Syne, sans-serif', fontSize: 14, color: '#e3e2e8' }}>{label}</span>
+      <Toggle checked={checked} onChange={onChange} />
+    </div>
+  );
+}
+
+function TimerRow({
+  label,
+  options,
+  selected,
+  unlimited,
+  accent,
+  onSelect,
+  onToggleUnlimited,
+}: {
+  label: string;
+  options: number[];
+  selected: number | null;
+  unlimited: boolean;
+  accent: string;
+  onSelect: (value: number) => void;
+  onToggleUnlimited: () => void;
+}) {
+  return (
+    <div
+      style={{
+        minHeight: 62,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 12,
+        padding: '10px 16px',
+        borderBottom: '1px solid rgba(255,255,255,0.04)',
+      }}
+    >
+      <span style={{ fontFamily: 'Syne, sans-serif', fontSize: 14, color: '#e3e2e8' }}>{label}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+        {unlimited ? (
+          <span style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, color: accent, letterSpacing: '0.08em' }}>
+            NO LIMIT
+          </span>
+        ) : (
+          options.map((value) => {
+            const active = selected === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                onClick={() => onSelect(value)}
+                style={{
+                  height: 28,
+                  padding: '0 10px',
+                  borderRadius: 8,
+                  border: `1px solid ${active ? accent : 'rgba(255,255,255,0.1)'}`,
+                  background: active ? accent : 'transparent',
+                  color: active ? '#000' : '#8c8a85',
+                  fontFamily: 'IBM Plex Mono, monospace',
+                  fontSize: 10,
+                  cursor: 'pointer',
+                }}
+              >
+                {value}s
+              </button>
+            );
+          })
+        )}
+        <button
+          type="button"
+          onClick={onToggleUnlimited}
+          style={{
+            height: 28,
+            padding: '0 10px',
+            borderRadius: 8,
+            border: '1px solid rgba(255,255,255,0.1)',
+            background: 'transparent',
+            color: '#4a5068',
+            fontFamily: 'IBM Plex Mono, monospace',
+            fontSize: 10,
+            cursor: 'pointer',
+          }}
+        >
+          {unlimited ? 'USE TIMER' : 'NO LIMIT'}
+        </button>
+      </div>
     </div>
   );
 }

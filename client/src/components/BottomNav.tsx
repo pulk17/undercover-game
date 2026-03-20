@@ -28,6 +28,18 @@ const TABS = [
     ),
   },
   {
+    id: 'leaderboard',
+    label: 'RANK',
+    path: '/leaderboard',
+    icon: (active: boolean) => (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active ? '#e8c547' : 'rgba(255,255,255,0.4)'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M18 20V10" />
+        <path d="M12 20V4" />
+        <path d="M6 20v-6" />
+      </svg>
+    ),
+  },
+  {
     id: 'config',
     label: 'CONFIG',
     path: '/settings',
@@ -42,7 +54,7 @@ const TABS = [
 
 // Routes where the bottom nav should be hidden
 const HIDDEN_ON_EXACT = ['/create', '/join', '/onboarding'];
-const HIDDEN_ON_PREFIX = ['/game/'];
+const HIDDEN_ON_PREFIX = ['/game/', '/join/'];
 
 export function BottomNav() {
   const navigate = useNavigate();
@@ -59,51 +71,71 @@ export function BottomNav() {
         bottom: 0,
         left: 0,
         right: 0,
-        height: 80,
-        background: '#12141c',
-        borderTop: '1px solid rgba(255,255,255,0.05)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-around',
         zIndex: 100,
-        borderRadius: '20px 20px 0 0',
+        display: 'flex',
+        justifyContent: 'center',
+        padding: '0 14px calc(env(safe-area-inset-bottom, 0px) + 12px)',
+        pointerEvents: 'none',
       }}
     >
-      {TABS.map((tab) => {
-        const active = location.pathname === tab.path || (tab.path === '/lobby' && location.pathname === '/');
-        return (
-          <button
-            key={tab.id}
-            onClick={() => navigate(tab.path)}
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: 4,
-              padding: '8px 20px',
-              borderRadius: 10,
-              background: active ? 'rgba(232,197,71,0.08)' : 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              transition: 'background 150ms ease',
-              minWidth: 64,
-            }}
-          >
-            {tab.icon(active)}
-            <span
+      <div
+        style={{
+          width: '100%',
+          maxWidth: 420,
+          minHeight: 72,
+          background: 'rgba(18,20,28,0.94)',
+          border: '1px solid rgba(255,255,255,0.06)',
+          borderRadius: 24,
+          boxShadow: '0 16px 40px rgba(0,0,0,0.38)',
+          backdropFilter: 'blur(18px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-around',
+          pointerEvents: 'auto',
+        }}
+      >
+        {TABS.map((tab) => {
+          const active =
+            location.pathname === tab.path ||
+            (tab.path === '/lobby' && location.pathname === '/') ||
+            (tab.path === '/settings' &&
+              (location.pathname === '/settings' || location.pathname === '/profile'));
+
+          return (
+            <button
+              key={tab.id}
+              onClick={() => navigate(tab.path)}
+              aria-current={active ? 'page' : undefined}
               style={{
-                fontFamily: 'IBM Plex Mono, monospace',
-                fontSize: 9,
-                letterSpacing: '0.15em',
-                color: active ? '#e8c547' : 'rgba(255,255,255,0.4)',
-                transition: 'color 150ms ease',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 4,
+                padding: '10px 16px',
+                borderRadius: 14,
+                background: active ? 'rgba(232,197,71,0.08)' : 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                transition: 'background 150ms ease',
+                minWidth: 68,
               }}
             >
-              {tab.label}
-            </span>
-          </button>
-        );
-      })}
+              {tab.icon(active)}
+              <span
+                style={{
+                  fontFamily: 'IBM Plex Mono, monospace',
+                  fontSize: 9,
+                  letterSpacing: '0.15em',
+                  color: active ? '#e8c547' : 'rgba(255,255,255,0.4)',
+                  transition: 'color 150ms ease',
+                }}
+              >
+                {tab.label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
     </nav>
   );
 }

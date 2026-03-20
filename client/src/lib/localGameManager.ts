@@ -34,6 +34,7 @@ const DISTRIBUTION: Record<number, [number, number, number]> = {
   8:  [5, 2, 1],
   9:  [6, 2, 1],
   10: [7, 2, 1],
+  11: [7, 3, 1],
   12: [8, 3, 1],
 };
 
@@ -105,6 +106,18 @@ const STUB_PAIRS: WordPair[] = [
   { id: 'stub-5', wordA: 'Ocean', wordB: 'Sea', category: 'nature', difficulty: 'easy', language: 'en', region: 'global', ageGroup: 'all' },
 ];
 
+const LOCAL_ELIMINATION_DELAY_MS = 1500;
+
+function normalizeGuess(value: string): string {
+  return value
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
 // ─── Local game state ─────────────────────────────────────────────────────────
 
 export interface LocalGameState {
@@ -117,6 +130,7 @@ export interface LocalGameState {
   votes: VoteRecord[];
   currentTurnPlayerId: string | null;
   eliminatedThisRound: string | null;
+  revealedEliminationRole: Role | null;
   winner: WinFaction | null;
   wordPair: WordPair | null;
   /** Index into activePlayers for the current role-reveal handoff */
@@ -161,6 +175,7 @@ export class LocalGameManager {
       votes: [],
       currentTurnPlayerId: null,
       eliminatedThisRound: null,
+      revealedEliminationRole: null,
       winner: null,
       wordPair: null,
       revealIndex: 0,
@@ -195,6 +210,10 @@ export class LocalGameManager {
     arr?.forEach((l) => l(payload));
   }
 
+  private emitState(): void {
+    this.emit('phase_changed', { phase: this.state.phase, state: this.state });
+  }
+
   // ── Public state accessor ────────────────────────────────────────────────
 
   getState(): Readonly<LocalGameState> {
@@ -224,12 +243,13 @@ export class LocalGameManager {
       clueLog: [],
       votes: [],
       eliminatedThisRound: null,
+      revealedEliminationRole: null,
       winner: null,
       revealIndex: 0,
     };
 
     this.distributeRoles(wordPair);
-    this.emit('phase_changed', { phase: 'role_reveal', state: this.state });
+    this.emitState();
     this.startNextHandoff();
   }
 
@@ -270,10 +290,12 @@ export class LocalGameManager {
   // ── Clue phase ───────────────────────────────────────────────────────────
 
   private startCluePhase(): void {
-    const firstPlayer = this.state.activePlayers[0];
+    const shuffledActivePlayers = shuffle(this.state.activePlayers);
+    const firstPlayer = shuffledActivePlayers[0];
     this.state = {
       ...this.state,
       phase: 'clue',
+      activePlayers: shuffledActivePlayers,
       currentTurnPlayerId: firstPlayer,
       clueLog: this.state.round === 1 ? [] : this.state.clueLog,
     };
@@ -306,10 +328,12 @@ export class LocalGameManager {
     if (!nextPlayer) {
       // All players have submitted — move to discussion
       this.state = { ...this.state, clueLog: newLog, currentTurnPlayerId: null };
+      this.emitState();
       this.emit('clue_submitted', { entry });
       this.startDiscussionPhase();
     } else {
       this.state = { ...this.state, clueLog: newLog, currentTurnPlayerId: nextPlayer };
+      this.emitState();
       this.emit('clue_submitted', { entry });
       this.emit('turn_changed', { playerId: nextPlayer });
     }
@@ -345,6 +369,14 @@ export class LocalGameManager {
       this.emit('error', { message: 'Not in vote phase' });
       return;
     }
+    if (!this.state.activePlayers.includes(voterId)) {
+      this.emit('error', { message: 'Voter is not active' });
+      return;
+    }
+    if (!this.state.activePlayers.includes(targetId)) {
+      this.emit('error', { message: 'Target is not active' });
+      return;
+    }
     if (voterId === targetId) {
       this.emit('error', { message: 'Cannot vote for yourself' });
       return;
@@ -357,6 +389,7 @@ export class LocalGameManager {
     const vote: VoteRecord = { voterId, targetId, round: this.state.round };
     const newVotes = [...this.state.votes, vote];
     this.state = { ...this.state, votes: newVotes };
+    this.emitState();
 
     // Check if all active players have voted
     if (newVotes.length >= this.state.activePlayers.length) {
@@ -375,6 +408,10 @@ export class LocalGameManager {
       tally[v.targetId] = (tally[v.targetId] ?? 0) + 1;
     }
     this.emit('votes_revealed', { votes, tally });
+    if (Object.keys(tally).length === 0) {
+      this.advanceRound();
+      return;
+    }
     this.resolveElimination(tally);
   }
 
@@ -425,6 +462,7 @@ export class LocalGameManager {
       activePlayers: newActive,
       spectators: newSpectators,
       eliminatedThisRound: playerId,
+      revealedEliminationRole: this.config.postEliminationReveal ? role ?? null : null,
     };
 
     this.emit('elimination', {
@@ -433,24 +471,27 @@ export class LocalGameManager {
     });
     this.emit('phase_changed', { phase: 'elimination', state: this.state });
 
-    // Mr. White guess window
-    if (role === 'mr_white') {
-      this.state = { ...this.state, phase: 'mr_white_guess' };
-      this.emit('phase_changed', { phase: 'mr_white_guess', state: this.state });
-      return;
-    }
+    setTimeout(() => {
+      if (role === 'mr_white') {
+        this.state = { ...this.state, phase: 'mr_white_guess' };
+        this.emit('phase_changed', { phase: 'mr_white_guess', state: this.state });
+        return;
+      }
 
-    this.checkWinCondition();
+      this.checkWinCondition();
+    }, LOCAL_ELIMINATION_DELAY_MS);
   }
 
   submitMrWhiteGuess(guess: string): void {
     const wordPair = this.state.wordPair;
     const correct =
       wordPair !== null &&
-      guess.trim().toLowerCase() === wordPair.wordA.trim().toLowerCase();
+      normalizeGuess(guess) === normalizeGuess(wordPair.wordA);
 
     if (correct) {
       this.declareWinner('mr_white');
+    } else if (this.shouldEnterFinalConfrontation()) {
+      this.startVotePhase();
     } else {
       this.checkWinCondition();
     }
@@ -485,8 +526,8 @@ export class LocalGameManager {
       return 'undercover';
     }
 
-    // Mr. White win: mr_white active with exactly 3 players remaining
-    if (mrWhiteCount > 0 && activePlayers.length === 3) {
+    // Mr. White only wins passively as the last player standing.
+    if (mrWhiteCount > 0 && activePlayers.length === 1) {
       return 'mr_white';
     }
 
@@ -502,13 +543,35 @@ export class LocalGameManager {
   // ── Round advance ────────────────────────────────────────────────────────
 
   private advanceRound(): void {
+    if (this.shouldEnterFinalConfrontation()) {
+      this.state = {
+        ...this.state,
+        phase: 'mr_white_guess',
+        currentTurnPlayerId: null,
+        votes: [],
+      };
+      this.emitState();
+      return;
+    }
+
     this.state = {
       ...this.state,
       round: this.state.round + 1,
       eliminatedThisRound: null,
+      revealedEliminationRole: null,
       revealIndex: 0,
     };
     this.startCluePhase();
+  }
+
+  private shouldEnterFinalConfrontation(): boolean {
+    if (this.state.activePlayers.length !== 3) {
+      return false;
+    }
+
+    return this.state.activePlayers.some(
+      (playerId) => this.roleMap.get(playerId)?.role === 'mr_white',
+    );
   }
 
   // ── Role distribution ────────────────────────────────────────────────────
@@ -556,10 +619,10 @@ export class LocalGameManager {
     }
 
     const { categories, difficulty } = this.config;
-    let filtered = pairs.filter(
+    const filtered = pairs.filter(
       (p) =>
         (categories.length === 0 || categories.includes('any') || categories.includes(p.category)) &&
-        (difficulty === 'any' as any || p.difficulty === difficulty)
+        p.difficulty === difficulty
     );
 
     // Anti-repeat

@@ -9,15 +9,19 @@ import { redis } from '../lib/redis';
 import { cancelTurnTimer, advanceTurn, allCluesSubmitted, startTurnTimer } from '../lib/clueManager';
 import { cancelDiscussionTimer, scheduleDiscussionExpiry } from '../lib/discussionManager';
 import { revealVotes, cancelVoteTimer, scheduleVoteExpiry } from '../lib/voteManager';
+import { isWordGuessCorrect } from '../lib/wordGuess';
 import { awardXP } from '../lib/progressionService';
 import type { XPOutcome } from '../lib/progressionService';
 import { evaluateAchievements } from '../lib/achievementService';
 import type { AchievementContext } from '../lib/achievementService';
 import { adminFirestore } from '../lib/firebase';
+import { awardRoomLeaderboardPoints } from '../lib/roomLeaderboardService';
 
 const GAME_TTL = 60 * 60 * 24; // 24 hours
 const MR_WHITE_GUESS_TIMEOUT_MS = 10_000;
 const SELF_REVEAL_TIMEOUT_MS = 15_000;
+const ALLOWED_REACTIONS = new Set(['😂', '😭', '🤡', '💀', '👀', '🤯', '🙃', '😹']);
+const lastReactionAtBySocket = new Map<string, number>();
 
 // Tracks active Mr. White guess timers keyed by roomCode
 const mrWhiteGuessTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -27,8 +31,8 @@ const selfRevealTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 /**
  * Starts a 10s server-side timeout for the Mr. White guess window.
- * If Mr. White doesn't guess in time, the window expires and the game
- * advances to the next round.
+ * If Mr. White doesn't guess in time, the window either advances to the
+ * next round or continues into the final vote, depending on context.
  */
 export function startMrWhiteGuessTimer(roomCode: string, io: Server): void {
   // Cancel any existing timer for this room
@@ -68,6 +72,18 @@ export function cancelMrWhiteGuessTimer(roomCode: string): void {
     clearTimeout(existing);
     mrWhiteGuessTimers.delete(roomCode);
   }
+}
+
+function getFinalConfrontationMrWhiteId(gameState: GameState, room: Room): string | null {
+  if (gameState.phase !== 'mr_white_guess' || gameState.activePlayers.length !== 3) {
+    return null;
+  }
+
+  const mrWhitePlayer = room.players.find(
+    (player) => player.role === 'mr_white' && gameState.activePlayers.includes(player.id),
+  );
+
+  return mrWhitePlayer?.id ?? null;
 }
 
 /**
@@ -322,6 +338,13 @@ export function registerGameHandlers(socket: Socket, io: Server): void {
       const roomCode = socket.data.roomCode as string | undefined;
       if (!roomCode) return;
 
+      // Sanitize: strip HTML tags, trim, enforce length
+      const sanitized = String(clue ?? '').replace(/<[^>]*>/g, '').trim().slice(0, 60);
+      if (!sanitized) {
+        socket.emit('room:error', { message: 'Clue cannot be empty' });
+        return;
+      }
+
       const rawState = await redis.get<string>(`game:${roomCode}`);
       if (!rawState) return;
 
@@ -348,7 +371,7 @@ export function registerGameHandlers(socket: Socket, io: Server): void {
       const entry: ClueEntry = {
         playerId: socket.id,
         nickname,
-        clue,
+        clue: sanitized,
         round: gameState.round,
         timestamp: Date.now(),
       };
@@ -517,14 +540,8 @@ export function registerGameHandlers(socket: Socket, io: Server): void {
       // Cancel any running discussion timer
       cancelDiscussionTimer(roomCode);
 
-      // Transition to vote phase
-      gameState.phase = 'vote';
-      gameState.phaseEndsAt = null;
-
-      await redis.set(`game:${roomCode}`, JSON.stringify(gameState), { ex: GAME_TTL });
-
-      const publicState = toPublicGameState(gameState);
-      io.to(roomCode).emit('game:phase_changed', { phase: 'vote', state: publicState });
+      const { startVotePhase } = await import('../lib/voteManager');
+      await startVotePhase(io, roomCode, gameState);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to end discussion';
       socket.emit('room:error', { message });
@@ -562,11 +579,14 @@ export function registerGameHandlers(socket: Socket, io: Server): void {
       const requestCount = await redis.scard(earlyVoteKey);
       const majority = Math.ceil(gameState.activePlayers.length / 2);
 
+      // Get full set of requesters so every client knows if they already voted
+      const requestedBySet = await redis.smembers(earlyVoteKey) as string[];
+
       // Broadcast current request count so clients can show progress
       io.to(roomCode).emit('game:early_vote_update', {
         requestCount,
         required: majority,
-        requestedBy: socket.id,
+        requestedBy: requestedBySet,
       });
 
       if (requestCount >= majority) {
@@ -574,13 +594,8 @@ export function registerGameHandlers(socket: Socket, io: Server): void {
         cancelDiscussionTimer(roomCode);
         await redis.del(earlyVoteKey);
 
-        gameState.phase = 'vote';
-        gameState.phaseEndsAt = null;
-
-        await redis.set(`game:${roomCode}`, JSON.stringify(gameState), { ex: GAME_TTL });
-
-        const publicState = toPublicGameState(gameState);
-        io.to(roomCode).emit('game:phase_changed', { phase: 'vote', state: publicState });
+        const { startVotePhase } = await import('../lib/voteManager');
+        await startVotePhase(io, roomCode, gameState);
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to request early vote';
@@ -677,15 +692,17 @@ export function registerGameHandlers(socket: Socket, io: Server): void {
         return;
       }
 
-      // Socket must be a spectator (i.e. eliminated)
-      if (!gameState.spectators.includes(socket.id)) {
-        socket.emit('room:error', { message: 'Only the eliminated Mr. White can guess' });
-        return;
-      }
-
-      // Verify the socket belongs to the Mr. White player
       const room = await getRoom(roomCode);
       if (!room) return;
+
+      const finalConfrontationMrWhiteId = getFinalConfrontationMrWhiteId(gameState, room);
+      const isEliminatedMrWhite = gameState.spectators.includes(socket.id);
+      const isFinalConfrontationMrWhite = finalConfrontationMrWhiteId === socket.id;
+
+      if (!isEliminatedMrWhite && !isFinalConfrontationMrWhite) {
+        socket.emit('room:error', { message: 'Only Mr. White can submit a guess right now' });
+        return;
+      }
 
       const guessingPlayer = room.players.find((p) => p.id === socket.id);
       if (!guessingPlayer || guessingPlayer.role !== 'mr_white') {
@@ -703,12 +720,29 @@ export function registerGameHandlers(socket: Socket, io: Server): void {
       // Cancel the auto-expiry timer
       cancelMrWhiteGuessTimer(roomCode);
 
-      const isCorrect = guess.trim().toLowerCase() === civilianWord.toLowerCase();
+      const isCorrect = isWordGuessCorrect(guess, civilianWord);
 
       if (isCorrect) {
         // Mr. White wins
         gameState.winner = 'mr_white';
         gameState.phase = 'game_over';
+
+        if (room.config.mode === 'tournament') {
+          const { awardTournamentPoints } = await import('../lib/tournamentManager');
+          const correctVoters = gameState.votes
+            .filter((vote) => vote.targetId === gameState.eliminatedThisRound)
+            .map((vote) => vote.voterId);
+          const tournamentState = await awardTournamentPoints(roomCode, gameState, room, correctVoters);
+          if (tournamentState) {
+            gameState.tournamentScores = { ...tournamentState.scores };
+          }
+        }
+
+        const roomLeaderboardScores = await awardRoomLeaderboardPoints(room, gameState);
+        if (room.config.mode !== 'tournament') {
+          gameState.tournamentScores = roomLeaderboardScores;
+        }
+
         await redis.set(`game:${roomCode}`, JSON.stringify(gameState), { ex: GAME_TTL });
 
         const publicState = toPublicGameState(gameState);
@@ -717,8 +751,11 @@ export function registerGameHandlers(socket: Socket, io: Server): void {
         // Award XP and evaluate achievements for all players
         void awardXPForGame(io, room, gameState);
         void evaluateAchievementsForGame(io, room, gameState);
-      } else {
+      } else if (isFinalConfrontationMrWhite) {
         // Wrong guess — advance to next round
+        const { startVotePhase } = await import('../lib/voteManager');
+        await startVotePhase(io, roomCode, gameState);
+      } else {
         const { advanceToNextRound } = await import('../lib/eliminationManager');
         await advanceToNextRound(io, roomCode, gameState, room);
       }
@@ -839,12 +876,29 @@ export function registerGameHandlers(socket: Socket, io: Server): void {
       // Clean up side-channel key
       await redis.del(`self_reveal:${roomCode}`);
 
-      const isCorrect = guess.trim().toLowerCase() === civilianWord.toLowerCase();
+      const isCorrect = isWordGuessCorrect(guess, civilianWord);
 
       if (isCorrect) {
         // Undercover wins by correctly naming the civilian word
         gameState.winner = 'undercover';
         gameState.phase = 'game_over';
+
+        if (room.config.mode === 'tournament') {
+          const { awardTournamentPoints } = await import('../lib/tournamentManager');
+          const correctVoters = gameState.votes
+            .filter((vote) => vote.targetId === gameState.eliminatedThisRound)
+            .map((vote) => vote.voterId);
+          const tournamentState = await awardTournamentPoints(roomCode, gameState, room, correctVoters);
+          if (tournamentState) {
+            gameState.tournamentScores = { ...tournamentState.scores };
+          }
+        }
+
+        const roomLeaderboardScores = await awardRoomLeaderboardPoints(room, gameState);
+        if (room.config.mode !== 'tournament') {
+          gameState.tournamentScores = roomLeaderboardScores;
+        }
+
         await redis.set(`game:${roomCode}`, JSON.stringify(gameState), { ex: GAME_TTL });
 
         const publicState = toPublicGameState(gameState);
@@ -1080,6 +1134,19 @@ export function registerGameHandlers(socket: Socket, io: Server): void {
       await redis.del(`pause:${roomCode}`);
       await redis.del(`self_reveal:${roomCode}`);
 
+      const rawState = await redis.get<string>(`game:${roomCode}`);
+      if (rawState) {
+        const gameState: GameState =
+          typeof rawState === 'string' ? JSON.parse(rawState) : (rawState as GameState);
+        await redis.del(
+          `ready:${roomCode}`,
+          `early_vote:${roomCode}:${gameState.round}`,
+          `revote_restore:${roomCode}`,
+          `title_votes:${roomCode}`,
+          `title_voters:${roomCode}`,
+        );
+      }
+
       // Reset player roles/words and active status
       for (const player of room.players) {
         player.role = null;
@@ -1222,6 +1289,37 @@ export function registerGameHandlers(socket: Socket, io: Server): void {
     }
   });
 
+  socket.on('game:reaction', async ({ emoji }: { emoji: string }) => {
+    try {
+      const roomCode = socket.data.roomCode as string | undefined;
+      if (!roomCode || !ALLOWED_REACTIONS.has(emoji)) return;
+
+      const now = Date.now();
+      const lastSentAt = lastReactionAtBySocket.get(socket.id) ?? 0;
+      if (now - lastSentAt < 1200) {
+        return;
+      }
+      lastReactionAtBySocket.set(socket.id, now);
+
+      const room = await getRoom(roomCode);
+      if (!room || room.phase === 'lobby') return;
+
+      const player = room.players.find((entry) => entry.id === socket.id);
+      if (!player) return;
+
+      io.to(roomCode).emit('game:reaction', {
+        id: `${socket.id}:${now}`,
+        emoji,
+        playerId: player.id,
+        nickname: player.nickname,
+        avatarUrl: player.avatarUrl ?? null,
+        timestamp: now,
+      });
+    } catch {
+      // Ignore reaction failures so they never affect the game loop.
+    }
+  });
+
   // game:start
   socket.on('game:start', async () => {
     try {
@@ -1244,10 +1342,25 @@ export function registerGameHandlers(socket: Socket, io: Server): void {
         return;
       }
 
+      if (room.phase !== 'lobby') {
+        socket.emit('room:error', { message: 'Game is not in the lobby state' });
+        return;
+      }
+
       // Check minimum player count
       const activePlayers = room.players.filter((p) => p.isActive && p.isConnected);
       if (activePlayers.length < 3) {
         socket.emit('room:error', { message: 'At least 3 players are required to start' });
+        return;
+      }
+
+      const configurationError = RoleDistributor.validateConfiguration(
+        activePlayers.length,
+        room.config.mode,
+        room.config.detectiveEnabled,
+      );
+      if (configurationError) {
+        socket.emit('room:error', { message: configurationError });
         return;
       }
 

@@ -1,20 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useRoomStore, socket } from '../stores/roomStore';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useGameStore } from '../stores/gameStore';
-import type { PublicGameState } from '../../../shared/types';
+import { socket, useRoomStore } from '../stores/roomStore';
 
-const RECONNECT_WINDOW_S = 60; // must match server RECONNECT_TTL
+const RECONNECT_WINDOW_S = 60;
 const MAX_BACKOFF_MS = 30_000;
 
-/**
- * Full-screen overlay shown when the socket disconnects during a game.
- * Attempts to reconnect with exponential backoff and emits `game:reconnect`
- * once the socket is back online.
- */
 export function ReconnectingOverlay() {
-  const { isConnected, room, players } = useRoomStore();
-  const { setGameState } = useGameStore();
+  const { isConnected, room } = useRoomStore();
 
   const [visible, setVisible] = useState(false);
   const [countdown, setCountdown] = useState(RECONNECT_WINDOW_S);
@@ -23,80 +16,148 @@ export function ReconnectingOverlay() {
 
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const backoffRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const myPlayerIdRef = useRef<string>(socket.id ?? '');
+  const myPlayerIdRef = useRef('');
+  const reconnectPlayerIdRef = useRef('');
+  const reconnectRequestedRef = useRef(false);
+  const wasInRoomRef = useRef(false);
 
-  // Show overlay when disconnected while in a room
-  useEffect(() => {
-    if (!isConnected && room) {
-      setVisible(true);
-      setCountdown(RECONNECT_WINDOW_S);
-      setFailed(false);
-      startCountdown();
-    } else if (isConnected) {
-      setVisible(false);
-      clearTimers();
+  const clearTimers = useCallback(() => {
+    if (countdownRef.current) {
+      clearInterval(countdownRef.current);
+      countdownRef.current = null;
     }
-    return () => clearTimers();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isConnected, room]);
+    if (backoffRef.current) {
+      clearTimeout(backoffRef.current);
+      backoffRef.current = null;
+    }
+  }, []);
 
-  function clearTimers() {
-    if (countdownRef.current) clearInterval(countdownRef.current);
-    if (backoffRef.current) clearTimeout(backoffRef.current);
-  }
+  const completeReconnect = useCallback(() => {
+    if (socket.id) {
+      myPlayerIdRef.current = socket.id;
+    }
+    reconnectPlayerIdRef.current = '';
+    reconnectRequestedRef.current = false;
+    setVisible(false);
+    clearTimers();
+  }, [clearTimers]);
 
-  function startCountdown() {
-    if (countdownRef.current) clearInterval(countdownRef.current);
+  const startCountdown = useCallback(() => {
+    clearTimers();
     countdownRef.current = setInterval(() => {
       setCountdown((prev) => {
         if (prev <= 1) {
-          clearInterval(countdownRef.current!);
+          if (countdownRef.current) {
+            clearInterval(countdownRef.current);
+            countdownRef.current = null;
+          }
+          reconnectRequestedRef.current = false;
           setFailed(true);
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
-  }
+  }, [clearTimers]);
 
-  // Exponential backoff reconnect attempts
   useEffect(() => {
-    if (!visible || failed) return;
+    function onConnect() {
+      if (!visible && socket.id) {
+        myPlayerIdRef.current = socket.id;
+      }
+    }
+
+    function onStateSync() {
+      if (!visible) return;
+      completeReconnect();
+    }
+
+    function onRoomError({ message }: { message: string }) {
+      if (!visible) return;
+
+      const normalizedMessage = message.toLowerCase();
+      if (
+        normalizedMessage.includes('reconnect') ||
+        normalizedMessage.includes('rejoin') ||
+        normalizedMessage.includes('player not found')
+      ) {
+        reconnectRequestedRef.current = false;
+        setFailed(true);
+        clearTimers();
+      }
+    }
+
+    socket.on('connect', onConnect);
+    socket.on('game:state_sync', onStateSync);
+    socket.on('room:error', onRoomError);
+
+    if (socket.id) {
+      myPlayerIdRef.current = socket.id;
+    }
+
+    return () => {
+      socket.off('connect', onConnect);
+      socket.off('game:state_sync', onStateSync);
+      socket.off('room:error', onRoomError);
+    };
+  }, [clearTimers, completeReconnect, visible]);
+
+  useEffect(() => {
+    wasInRoomRef.current = Boolean(room);
+  }, [room]);
+
+  useEffect(() => {
+    if (!isConnected && wasInRoomRef.current) {
+      reconnectPlayerIdRef.current = myPlayerIdRef.current || socket.id || '';
+      reconnectRequestedRef.current = false;
+      setVisible(true);
+      setCountdown(RECONNECT_WINDOW_S);
+      setFailed(false);
+      setAttempt(0);
+      startCountdown();
+      return;
+    }
+
+    if (isConnected && !reconnectRequestedRef.current) {
+      setVisible(false);
+      clearTimers();
+    }
+  }, [clearTimers, isConnected, startCountdown]);
+
+  useEffect(() => {
+    if (!visible || failed || isConnected) return;
 
     const delayMs = Math.min(1000 * 2 ** attempt, MAX_BACKOFF_MS);
     backoffRef.current = setTimeout(() => {
       if (!socket.connected) {
         socket.connect();
-        setAttempt((a) => a + 1);
+        setAttempt((value) => value + 1);
       }
     }, delayMs);
 
     return () => {
-      if (backoffRef.current) clearTimeout(backoffRef.current);
+      if (backoffRef.current) {
+        clearTimeout(backoffRef.current);
+        backoffRef.current = null;
+      }
     };
-  }, [visible, attempt, failed]);
+  }, [attempt, failed, isConnected, visible]);
 
-  // Once socket reconnects, emit game:reconnect to restore state
   useEffect(() => {
-    if (!isConnected || !room) return;
+    if (!isConnected || !room || !visible || failed || reconnectRequestedRef.current) return;
 
-    const playerId = myPlayerIdRef.current;
+    const playerId = reconnectPlayerIdRef.current;
+    if (!playerId) {
+      setFailed(true);
+      clearTimers();
+      return;
+    }
+
+    reconnectRequestedRef.current = true;
     socket.emit('game:reconnect', { roomCode: room.code, playerId });
+  }, [clearTimers, failed, isConnected, room, visible]);
 
-    // Listen for state sync response
-    socket.once('game:state_sync', ({ state, players: updatedPlayers }: {
-      state: PublicGameState | null;
-      players: typeof players;
-    }) => {
-      if (state) setGameState(state);
-      useRoomStore.setState({ players: updatedPlayers });
-    });
-  }, [isConnected, room]);
-
-  // Track our own socket ID before disconnect
-  useEffect(() => {
-    if (socket.id) myPlayerIdRef.current = socket.id;
-  }, [isConnected]);
+  useEffect(() => () => clearTimers(), [clearTimers]);
 
   if (!visible) return null;
 
@@ -110,7 +171,7 @@ export function ReconnectingOverlay() {
         style={{
           position: 'fixed',
           inset: 0,
-          zIndex: 50,
+          zIndex: 9999,
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
@@ -123,14 +184,32 @@ export function ReconnectingOverlay() {
       >
         {failed ? (
           <>
-            <p style={{ fontSize: 36, marginBottom: 8 }}>⚠️</p>
-            <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 20, color: '#e84b4b', marginBottom: 8 }}>Connection lost</h2>
+            <div
+              style={{
+                marginBottom: 12,
+                borderRadius: 999,
+                border: '1px solid rgba(232,75,75,0.35)',
+                background: 'rgba(232,75,75,0.08)',
+                color: '#e84b4b',
+                fontFamily: 'IBM Plex Mono, monospace',
+                fontSize: 11,
+                letterSpacing: '0.14em',
+                padding: '6px 12px',
+              }}
+            >
+              OFFLINE
+            </div>
+            <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 20, color: '#e84b4b', marginBottom: 8 }}>
+              Connection lost
+            </h2>
             <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 13, color: '#8c8a85', marginBottom: 24 }}>
               The reconnect window expired. Please rejoin the room.
             </p>
             <button
               onClick={() => {
+                reconnectRequestedRef.current = false;
                 setVisible(false);
+                clearTimers();
                 useRoomStore.getState().reset();
                 useGameStore.getState().reset();
               }}
@@ -151,7 +230,6 @@ export function ReconnectingOverlay() {
           </>
         ) : (
           <>
-            {/* Spinner */}
             <motion.div
               animate={{ rotate: 360 }}
               transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
@@ -164,13 +242,14 @@ export function ReconnectingOverlay() {
                 marginBottom: 24,
               }}
             />
-            <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 20, color: '#e3e2e8', marginBottom: 4 }}>Reconnecting…</h2>
+            <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 20, color: '#e3e2e8', marginBottom: 4 }}>
+              Reconnecting...
+            </h2>
             <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 13, color: '#8c8a85', marginBottom: 16 }}>
-              Attempt {attempt + 1} — your spot is held for{' '}
-              <span style={{ fontFamily: 'IBM Plex Mono, monospace', color: '#e8c547' }}>{countdown}s</span>
+              Attempt {attempt + 1}. Your spot is held for <span style={{ color: '#e8c547' }}>{countdown}s</span>
             </p>
             <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 11, color: '#4a5068' }}>
-              Don't close this tab — we'll get you back in automatically.
+              Do not close this tab. We will restore your seat automatically.
             </p>
           </>
         )}

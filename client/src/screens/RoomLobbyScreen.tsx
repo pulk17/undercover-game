@@ -6,24 +6,39 @@ import { useAuthStore } from '../stores/authStore';
 import { useLocalGameStore } from '../stores/localGameStore';
 import type { GameConfig, Player } from '../../../shared/types';
 
-// Deterministic accent color per player
 const PLAYER_COLORS = ['#3ecfb0', '#e8c547', '#9b6fe8', '#e84b4b', '#60a5fa', '#f97316', '#34d399', '#f472b6'];
-function playerColor(idx: number) { return PLAYER_COLORS[idx % PLAYER_COLORS.length]; }
+
+function playerColor(index: number) {
+  return PLAYER_COLORS[index % PLAYER_COLORS.length];
+}
 
 export default function RoomLobbyScreen() {
   const navigate = useNavigate();
-  const { room, players, isHost, qrDataUrl, leaveRoom } = useRoomStore();
+  const { room, players, isHost, leaveRoom, error, isConnected } = useRoomStore();
   const { user } = useAuthStore();
-  const [copied, setCopied] = useState(false);
+  const [shareFeedback, setShareFeedback] = useState<string | null>(null);
+
+  function flashFeedback(message: string) {
+    setShareFeedback(message);
+    window.setTimeout(() => setShareFeedback(null), 1600);
+  }
 
   async function handleLocalPlay() {
     const { initLocalGame, startGame } = useLocalGameStore.getState();
-    const localPlayers: Player[] = [
-      { id: 'p1', userId: null, nickname: 'Player 1', avatarUrl: null, role: null, word: null, isHost: true, isActive: true, isConnected: true, joinOrder: 0, strikes: 0 },
-      { id: 'p2', userId: null, nickname: 'Player 2', avatarUrl: null, role: null, word: null, isHost: false, isActive: true, isConnected: true, joinOrder: 1, strikes: 0 },
-      { id: 'p3', userId: null, nickname: 'Player 3', avatarUrl: null, role: null, word: null, isHost: false, isActive: true, isConnected: true, joinOrder: 2, strikes: 0 },
-      { id: 'p4', userId: null, nickname: 'Player 4', avatarUrl: null, role: null, word: null, isHost: false, isActive: true, isConnected: true, joinOrder: 3, strikes: 0 },
-    ];
+    const localPlayers: Player[] = Array.from({ length: 4 }, (_, index) => ({
+      id: `p${index + 1}`,
+      userId: null,
+      nickname: `Player ${index + 1}`,
+      avatarUrl: null,
+      role: null,
+      word: null,
+      isHost: index === 0,
+      isActive: true,
+      isConnected: true,
+      joinOrder: index,
+      strikes: 0,
+    }));
+
     const config: GameConfig = {
       mode: 'classic',
       categories: ['general'],
@@ -37,463 +52,433 @@ export default function RoomLobbyScreen() {
       maxPlayers: 4,
       customWordPair: null,
     };
+
     initLocalGame(localPlayers, config);
     await startGame();
     navigate('/game/pass');
   }
 
-  // When there's no room, show the home/landing view instead of redirecting
-  if (!room) {
-    return (
-      <div style={{
-        minHeight: '100vh',
-        background: '#08090d',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '24px 20px',
-        gap: 32,
-      }}>
-        {/* Logo */}
-        <motion.div
-          initial={{ opacity: 0, y: -16 }}
-          animate={{ opacity: 1, y: 0 }}
-          style={{ textAlign: 'center' }}
-        >
-          <h1 style={{
-            fontFamily: 'Syne, sans-serif',
-            fontWeight: 800,
-            fontSize: 'clamp(36px, 9vw, 52px)',
-            color: '#e3e2e8',
-            margin: '0 0 8px',
-            letterSpacing: '-0.03em',
-            textTransform: 'uppercase',
-          }}>
-            UNDERCOVER
-          </h1>
-          <p style={{
-            fontFamily: 'IBM Plex Mono, monospace',
-            fontSize: 10,
-            letterSpacing: '0.2em',
-            color: '#4a5068',
-            textTransform: 'uppercase',
-            margin: 0,
-          }}>
-            WHO IS THE SPY?
-          </p>
-        </motion.div>
+  async function handleCopyCode() {
+    if (!room) return;
 
-        {/* CTA Buttons */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1, duration: 0.4, ease: 'easeOut' }}
-          style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%', maxWidth: 320 }}
-        >
-          <button className="btn-primary" onClick={() => navigate('/create')}>
-            CREATE ROOM
-          </button>
-          <button className="btn-secondary" onClick={() => navigate('/join')}>
-            JOIN ROOM
-          </button>
-          <button
-            onClick={handleLocalPlay}
-            style={{
-              height: 52,
-              background: 'rgba(155,111,232,0.1)',
-              border: '1px solid rgba(155,111,232,0.3)',
-              borderRadius: 12,
-              fontFamily: 'IBM Plex Mono, monospace',
-              fontSize: 12,
-              color: '#9b6fe8',
-              cursor: 'pointer',
-              letterSpacing: '0.08em',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: '100%',
-              transition: 'all 150ms ease',
-            }}
-          >
-            LOCAL PLAY — PASS & PLAY
-          </button>
-        </motion.div>
-
-        {/* User info footer */}
-        {user && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.3 }}
-            onClick={() => navigate('/profile')}
-            style={{
-              position: 'absolute',
-              bottom: 100,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 12,
-              cursor: 'pointer',
-            }}
-          >
-            <div style={{
-              width: 36,
-              height: 36,
-              borderRadius: '50%',
-              background: 'rgba(232,197,71,0.15)',
-              border: '1px solid rgba(232,197,71,0.4)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontFamily: 'Syne, sans-serif',
-              fontWeight: 700,
-              fontSize: 12,
-              color: '#e8c547',
-            }}>
-              {(user.nickname || user.displayName || 'PK').slice(0, 2).toUpperCase()}
-            </div>
-            <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 11, color: '#8c8a85', margin: 0 }}>
-              {user.nickname || user.displayName}
-            </p>
-          </motion.div>
-        )}
-      </div>
-    );
+    try {
+      await navigator.clipboard.writeText(room.code);
+      flashFeedback('Code copied');
+    } catch {
+      flashFeedback('Copy unavailable');
+    }
   }
 
-  const canStart = players.length >= 3;
+  async function handleInvite() {
+    if (!room) return;
+
+    const inviteText = `Join my Undercover room: ${room.code}`;
+    if (navigator.share) {
+      await navigator.share({ title: 'Undercover', text: inviteText }).catch(() => undefined);
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(inviteText);
+      flashFeedback('Invite copied');
+    } catch {
+      flashFeedback('Share unavailable');
+    }
+  }
 
   async function handleLeave() {
     await leaveRoom();
     navigate('/lobby');
   }
 
-  function handleStart() {
-    socket.emit('game:start', { code: room!.code });
+  function handleStartGame() {
+    if (!room) return;
+    socket.emit('game:start');
   }
 
-  async function handleCopy() {
-    await navigator.clipboard.writeText(room!.code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
+  if (!room) {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          background: '#000',
+          padding: '24px 20px calc(env(safe-area-inset-bottom, 0px) + 110px)',
+        }}
+      >
+        <div style={{ width: '100%', maxWidth: 380, margin: '0 auto', minHeight: 'calc(100vh - 154px)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 28 }}>
+          <div>
+            <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} style={{ textAlign: 'center', marginBottom: 22 }}>
+              <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, color: '#4a5068', margin: '0 0 10px', letterSpacing: '0.2em', textTransform: 'uppercase' }}>
+                Social Deduction Party Game
+              </p>
+              <h1 style={{ fontFamily: 'Syne, sans-serif', fontSize: 'clamp(30px, 8vw, 44px)', lineHeight: 0.95, fontWeight: 800, color: '#e3e2e8', margin: '0 0 12px', letterSpacing: '-0.035em' }}>
+                UNDERCOVER
+              </h1>
+              <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 11, color: '#8c8a85', margin: 0, lineHeight: 1.7 }}>
+                Create a room for remote play or hand one device around for a quick local round.
+              </p>
+            </motion.div>
 
-  const cfg = room.config;
-
-  return (
-    <div style={{
-      minHeight: '100vh',
-      background: '#08090d',
-      color: '#e3e2e8',
-      paddingBottom: 100,
-    }}>
-      {/* Header */}
-      <div style={{ padding: '20px 20px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
-          <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 11, color: '#e8c547', letterSpacing: '0.15em', margin: '0 0 2px', textTransform: 'uppercase' }}>
-            ROOM: {room.code}
-          </p>
-          <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 9, color: '#4a5068', letterSpacing: '0.1em', margin: 0, textTransform: 'uppercase' }}>
-            OPERATION: SILENT WOLF
-          </p>
-        </div>
-        <button
-          onClick={() => {/* notification placeholder */}}
-          style={{ background: 'none', border: 'none', color: '#4a5068', fontSize: 18, cursor: 'pointer', padding: 4 }}
-          aria-label="Notifications"
-        >
-          🔔
-        </button>
-      </div>
-
-      <div style={{ padding: '20px 20px 0', display: 'flex', flexDirection: 'column', gap: 20 }}>
-
-        {/* Room code card */}
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.05 }}
-          style={{
-            background: '#12141c',
-            border: '1px dashed rgba(232,197,71,0.4)',
-            borderRadius: 14,
-            padding: '20px 20px 16px',
-            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
-          }}
-        >
-          <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, letterSpacing: '0.2em', color: '#4a5068', textTransform: 'uppercase', margin: '0 0 8px', textAlign: 'center' }}>
-            IDENTIFICATION CODE
-          </p>
-          <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontWeight: 800, fontSize: 48, color: '#e8c547', letterSpacing: '0.1em', margin: '0 0 8px', textAlign: 'center', lineHeight: 1 }}>
-            {room.code}
-          </p>
-          <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, color: '#4a5068', textAlign: 'center', margin: '0 0 16px' }}>
-            Distribute credentials to allied operatives
-          </p>
-          <div style={{ display: 'flex', gap: 10 }}>
-            {qrDataUrl && (
-              <button
-                onClick={() => {/* show QR */}}
+            {!isConnected && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.03 }}
                 style={{
-                  flex: 1,
-                  height: 40,
-                  background: 'transparent',
-                  border: '1px solid rgba(255,255,255,0.12)',
-                  borderRadius: 10,
-                  fontFamily: 'IBM Plex Mono, monospace',
-                  fontSize: 11,
-                  color: '#e3e2e8',
-                  cursor: 'pointer',
-                  letterSpacing: '0.08em',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 6,
+                  marginBottom: 16,
+                  background: 'rgba(232,75,75,0.08)',
+                  border: '1px solid rgba(232,75,75,0.18)',
+                  borderRadius: 14,
+                  padding: '12px 14px',
                 }}
               >
-                ▦ SHOW QR
-              </button>
+                <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, color: '#e84b4b', margin: 0, letterSpacing: '0.08em' }}>
+                  Reconnecting to the server. Online room actions will resume shortly.
+                </p>
+              </motion.div>
             )}
-            <button
-              onClick={handleCopy}
+
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.06 }}
+              style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%' }}
+            >
+              <button className="btn-primary" onClick={() => navigate('/create')} disabled={!isConnected}>
+                Create Room
+              </button>
+              <button className="btn-secondary" onClick={() => navigate('/join')} disabled={!isConnected}>
+                Join Room
+              </button>
+              <button
+                type="button"
+                onClick={handleLocalPlay}
+                style={{
+                  height: 52,
+                  borderRadius: 12,
+                  border: '1px solid rgba(155,111,232,0.26)',
+                  background: 'rgba(155,111,232,0.08)',
+                  color: '#b89af8',
+                  fontFamily: 'IBM Plex Mono, monospace',
+                  fontSize: 12,
+                  letterSpacing: '0.08em',
+                  cursor: 'pointer',
+                }}
+              >
+                Local Pass-and-Play
+              </button>
+            </motion.div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.12 }}
               style={{
-                flex: 1,
-                height: 40,
-                background: 'transparent',
-                border: '1px solid rgba(255,255,255,0.12)',
-                borderRadius: 10,
-                fontFamily: 'IBM Plex Mono, monospace',
-                fontSize: 11,
-                color: copied ? '#3ecfb0' : '#e3e2e8',
-                cursor: 'pointer',
-                letterSpacing: '0.08em',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 6,
-                transition: 'color 150ms ease',
+                background: '#12141c',
+                border: '1px solid rgba(255,255,255,0.07)',
+                borderRadius: 16,
+                padding: '16px 18px',
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: 12,
               }}
             >
-              ⎘ {copied ? 'COPIED!' : 'COPY LINK'}
+              <div>
+                <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 9, color: '#4a5068', margin: '0 0 6px', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+                  Online
+                </p>
+                <p style={{ fontFamily: 'Syne, sans-serif', fontSize: 15, color: '#e3e2e8', margin: 0, lineHeight: 1.4 }}>
+                  Share a code and play from separate devices.
+                </p>
+              </div>
+              <div>
+                <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 9, color: '#4a5068', margin: '0 0 6px', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+                  Local
+                </p>
+                <p style={{ fontFamily: 'Syne, sans-serif', fontSize: 15, color: '#e3e2e8', margin: 0, lineHeight: 1.4 }}>
+                  Pass one phone around and keep the round moving fast.
+                </p>
+              </div>
+            </motion.div>
+
+            <button
+              type="button"
+              onClick={() => navigate('/how-to-play')}
+              style={{
+                height: 44,
+                borderRadius: 12,
+                border: '1px solid rgba(255,255,255,0.09)',
+                background: 'transparent',
+                color: '#8c8a85',
+                fontFamily: 'IBM Plex Mono, monospace',
+                fontSize: 11,
+                letterSpacing: '0.08em',
+                cursor: 'pointer',
+              }}
+            >
+              How To Play
             </button>
-          </div>
-        </motion.div>
 
-        {/* Config chips */}
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}
-        >
-          <ConfigChip label={cfg.mode.replace(/_/g, ' ').toUpperCase()} color="#e8c547" />
-          <ConfigChip label={cfg.categories.join(', ').toUpperCase()} color="#3ecfb0" />
-          <ConfigChip label={`DIFFICULTY: ${cfg.difficulty.toUpperCase()}`} color="#9b6fe8" />
-        </motion.div>
-
-        {/* Player list */}
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 14, color: '#e3e2e8', margin: 0, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-              VERIFIED OPERATIVES ({players.length}/{cfg.maxPlayers})
-            </p>
-            <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 9, color: '#4a5068', margin: 0, letterSpacing: '0.1em' }}>
-              RN: 042-ALPHA
-            </p>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {players.map((player, idx) => {
-              const color = playerColor(idx);
-              const initials = player.nickname.slice(0, 2).toUpperCase();
-              const isMe = player.userId === user?.uid;
-              const ready = player.isConnected;
-
-              return (
-                <motion.div
-                  key={player.id}
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.15 + idx * 0.05 }}
+            {user && (
+              <motion.button
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.18 }}
+                onClick={() => navigate('/profile')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  background: 'none',
+                  border: 'none',
+                  color: '#8c8a85',
+                  cursor: 'pointer',
+                  justifyContent: 'center',
+                }}
+              >
+                <div
                   style={{
-                    background: '#12141c',
-                    border: '1px solid rgba(255,255,255,0.07)',
+                    width: 36,
+                    height: 36,
                     borderRadius: 12,
-                    height: 68,
-                    display: 'flex',
-                    alignItems: 'center',
-                    padding: '0 16px',
-                    gap: 14,
-                    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
-                  }}
-                >
-                  {/* Avatar */}
-                  <div style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 10,
-                    background: `${color}22`,
-                    border: `1px solid ${color}55`,
+                    background: 'rgba(232,197,71,0.14)',
+                    border: '1px solid rgba(232,197,71,0.28)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     fontFamily: 'Syne, sans-serif',
-                    fontWeight: 700,
-                    fontSize: 13,
-                    color,
-                    flexShrink: 0,
-                  }}>
-                    {initials}
-                  </div>
+                    fontWeight: 800,
+                    color: '#e8c547',
+                  }}
+                >
+                  {(user.nickname || user.displayName || 'P').slice(0, 2).toUpperCase()}
+                </div>
+                <span style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 11 }}>
+                  {user.nickname || user.displayName}
+                </span>
+              </motion.button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-                  {/* Name + ID */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontWeight: 600, fontSize: 13, color: '#e3e2e8', margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
-                      {player.nickname.toUpperCase()}
-                      {player.isHost && <span style={{ color: '#e8c547', fontSize: 12 }}>♛</span>}
-                      {isMe && <span style={{ color: '#4a5068', fontSize: 10 }}>(you)</span>}
-                    </p>
-                    <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 9, color: '#4a5068', margin: '2px 0 0', letterSpacing: '0.08em' }}>
-                      ID: {String(idx + 1).padStart(3, '0')}-{['ALPHA', 'KAPPA', 'SIGMA', 'DELTA', 'OMEGA', 'ZETA', 'BETA', 'GAMMA'][idx % 8]}
-                    </p>
-                  </div>
+  const connectedPlayers = players.filter((player) => player.isConnected);
+  const canStart = connectedPlayers.length >= 3;
+  const config = room.config;
 
-                  {/* Status */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <div
-                      className="pulse-dot"
-                      style={{ background: ready ? '#3ecfb0' : '#e8c547' }}
-                    />
-                    <span style={{
-                      fontFamily: 'IBM Plex Mono, monospace',
-                      fontSize: 10,
-                      letterSpacing: '0.08em',
-                      color: ready ? '#3ecfb0' : '#e8c547',
-                    }}>
-                      {ready ? 'READY' : 'WAITING...'}
-                    </span>
-                  </div>
-                </motion.div>
-              );
-            })}
+  return (
+    <div style={{ minHeight: '100vh', background: '#000', color: '#e3e2e8', padding: '20px 20px 100px' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 18 }}>
+        <div style={{ minWidth: 0 }}>
+          <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, color: '#4a5068', margin: '0 0 4px', letterSpacing: '0.16em', textTransform: 'uppercase' }}>
+            Room Code
+          </p>
+          <h1 style={{ fontFamily: 'Syne, sans-serif', fontSize: 26, fontWeight: 800, margin: 0, letterSpacing: '-0.02em' }}>
+            {room.code}
+          </h1>
+        </div>
 
-            {/* Empty slots */}
-            {Array.from({ length: Math.max(0, cfg.maxPlayers - players.length) }).slice(0, 3).map((_, i) => (
+        <button
+          type="button"
+          onClick={() => navigate('/settings')}
+          style={{
+            background: 'none',
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: 12,
+            height: 40,
+            padding: '0 14px',
+            color: '#8c8a85',
+            fontFamily: 'IBM Plex Mono, monospace',
+            fontSize: 11,
+            letterSpacing: '0.08em',
+            cursor: 'pointer',
+            flexShrink: 0,
+          }}
+        >
+          Settings
+        </button>
+      </div>
+
+      <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} style={{ background: '#12141c', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 16, padding: '18px 18px 16px', marginBottom: 16 }}>
+        <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, color: '#4a5068', margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.16em', textAlign: 'center' }}>
+          Share This Code
+        </p>
+        <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 'clamp(36px, 10vw, 48px)', color: '#e8c547', margin: '0 0 10px', textAlign: 'center', letterSpacing: '0.12em', lineHeight: 1 }}>
+          {room.code}
+        </p>
+        {shareFeedback && (
+          <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, color: '#3ecfb0', margin: '0 0 10px', textAlign: 'center', letterSpacing: '0.08em' }}>
+            {shareFeedback}
+          </p>
+        )}
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button type="button" onClick={handleCopyCode} className="btn-secondary" style={{ height: 42 }}>
+            Copy Code
+          </button>
+          <button type="button" onClick={() => void handleInvite()} className="btn-secondary" style={{ height: 42 }}>
+            Invite
+          </button>
+        </div>
+      </motion.section>
+
+      <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.04 }} style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+        <Chip color="#e8c547" label={config.mode.replace(/_/g, ' ')} />
+        <Chip color="#3ecfb0" label={config.categories.join(', ')} />
+        <Chip color="#9b6fe8" label={config.difficulty} />
+        <Chip color="#60a5fa" label={`Max ${config.maxPlayers}`} />
+      </motion.section>
+
+      <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }} style={{ marginBottom: 18 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+          <p style={{ fontFamily: 'Syne, sans-serif', fontSize: 15, fontWeight: 700, margin: 0 }}>
+            Players ({players.length}/{config.maxPlayers})
+          </p>
+          <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, color: '#4a5068', margin: 0, letterSpacing: '0.08em' }}>
+            {canStart ? 'Ready to start' : `Need 3 connected players (${connectedPlayers.length}/3)`}
+          </p>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {players.map((player, index) => {
+            const accent = playerColor(index);
+            const isMe = player.userId === user?.uid || player.id === socket.id;
+            return (
               <div
-                key={`empty-${i}`}
+                key={player.id}
                 style={{
-                  background: 'transparent',
-                  border: '1px dashed rgba(255,255,255,0.07)',
-                  borderRadius: 12,
-                  height: 68,
+                  background: '#12141c',
+                  border: '1px solid rgba(255,255,255,0.07)',
+                  borderRadius: 14,
+                  padding: '14px 16px',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#4a5068',
-                  fontSize: 20,
+                  gap: 12,
                 }}
               >
-                +
+                <div
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 12,
+                    background: `${accent}18`,
+                    border: `1px solid ${accent}36`,
+                    color: accent,
+                    fontFamily: 'Syne, sans-serif',
+                    fontWeight: 800,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  {player.nickname.slice(0, 2).toUpperCase()}
+                </div>
+
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontFamily: 'Syne, sans-serif', fontSize: 15, color: '#e3e2e8', margin: '0 0 4px' }}>
+                    {player.nickname}
+                    {player.isHost ? ' (Host)' : ''}
+                    {isMe ? ' (You)' : ''}
+                  </p>
+                  <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, color: player.isConnected ? '#3ecfb0' : '#e8c547', margin: 0, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                    {player.isConnected ? 'Connected' : 'Reconnecting'}
+                  </p>
+                </div>
               </div>
-            ))}
-          </div>
-        </motion.div>
+            );
+          })}
+        </div>
+      </motion.section>
 
-        {/* Start / Leave */}
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
+      {error && (
+        <div
+          style={{
+            marginBottom: 14,
+            background: 'rgba(232,75,75,0.08)',
+            border: '1px solid rgba(232,75,75,0.22)',
+            borderRadius: 12,
+            padding: '12px 14px',
+          }}
         >
-          {isHost ? (
-            <button
-              onClick={handleStart}
-              disabled={!canStart}
-              className="btn-primary"
-              style={{ height: 56, fontSize: 15 }}
-            >
-              START MISSION
+          <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 11, color: '#e84b4b', margin: 0, lineHeight: 1.5 }}>
+            {error}
+          </p>
+        </div>
+      )}
+
+      <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {isHost ? (
+          <>
+            <button type="button" onClick={handleStartGame} disabled={!canStart || !isConnected} className="btn-primary" style={{ height: 56 }}>
+              Start Game
             </button>
-          ) : (
-            <div style={{
-              height: 56,
-              background: '#12141c',
-              border: '1px solid rgba(255,255,255,0.07)',
-              borderRadius: 12,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 10,
-            }}>
-              <div className="pulse-dot" style={{ background: '#e8c547' }} />
-              <span style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 12, color: '#8c8a85', letterSpacing: '0.1em' }}>
-                AWAITING HOST COMMAND
-              </span>
-            </div>
-          )}
+            <button
+              type="button"
+              onClick={() => navigate('/create?edit=1')}
+              style={{
+                height: 44,
+                borderRadius: 12,
+                border: '1px solid rgba(232,197,71,0.25)',
+                background: 'transparent',
+                color: '#e8c547',
+                fontFamily: 'IBM Plex Mono, monospace',
+                fontSize: 11,
+                letterSpacing: '0.08em',
+                cursor: 'pointer',
+              }}
+            >
+              Party Settings
+            </button>
+          </>
+        ) : (
+          <div style={{ height: 54, borderRadius: 14, background: '#12141c', border: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 11, color: '#8c8a85', letterSpacing: '0.08em' }}>
+              Waiting for the host to start
+            </span>
+          </div>
+        )}
 
-          <button
-            onClick={() => {/* invite */}}
-            style={{
-              height: 44,
-              background: 'transparent',
-              border: '1px solid rgba(255,255,255,0.07)',
-              borderRadius: 12,
-              fontFamily: 'IBM Plex Mono, monospace',
-              fontSize: 11,
-              color: '#8c8a85',
-              cursor: 'pointer',
-              letterSpacing: '0.1em',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 8,
-            }}
-          >
-            ⊕ INVITE FRIENDS
-          </button>
-
-          <button
-            onClick={handleLeave}
-            style={{
-              height: 44,
-              background: 'transparent',
-              border: 'none',
-              fontFamily: 'IBM Plex Mono, monospace',
-              fontSize: 11,
-              color: '#e84b4b',
-              cursor: 'pointer',
-              letterSpacing: '0.1em',
-            }}
-          >
-            LEAVE ROOM
-          </button>
-        </motion.div>
-      </div>
+        <button
+          type="button"
+          onClick={handleLeave}
+          style={{
+            height: 42,
+            border: 'none',
+            background: 'transparent',
+            color: '#e84b4b',
+            fontFamily: 'IBM Plex Mono, monospace',
+            fontSize: 11,
+            letterSpacing: '0.08em',
+            cursor: 'pointer',
+          }}
+        >
+          Leave Room
+        </button>
+      </motion.section>
     </div>
   );
 }
 
-function ConfigChip({ label, color }: { label: string; color: string }) {
+function Chip({ label, color }: { label: string; color: string }) {
   return (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: 8,
-      background: `${color}11`,
-      border: `1px solid ${color}33`,
-      borderRadius: 8,
-      padding: '5px 10px',
-      borderLeft: `3px solid ${color}`,
-    }}>
-      <span style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, color, letterSpacing: '0.08em' }}>
-        {label}
-      </span>
+    <div
+      style={{
+        background: `${color}12`,
+        border: `1px solid ${color}28`,
+        color,
+        borderRadius: 999,
+        padding: '6px 10px',
+        fontFamily: 'IBM Plex Mono, monospace',
+        fontSize: 10,
+        letterSpacing: '0.08em',
+        textTransform: 'uppercase',
+      }}
+    >
+      {label}
     </div>
   );
 }

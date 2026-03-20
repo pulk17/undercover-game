@@ -2,13 +2,16 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../middleware/auth';
 import { adminFirestore } from '../lib/firebase';
+import { getRoom } from '../managers/RoomManager';
+import { getParticipantKey, getRoomLeaderboardScores } from '../lib/roomLeaderboardService';
 
 export const leaderboardRouter = Router();
 
 leaderboardRouter.use(requireAuth);
 
 const scopeSchema = z.object({
-  scope: z.enum(['global', 'friends', 'country']).default('global'),
+  scope: z.enum(['global', 'friends', 'country', 'room']).default('global'),
+  code: z.string().trim().min(4).max(8).optional(),
 });
 
 interface LeaderboardEntry {
@@ -37,7 +40,7 @@ leaderboardRouter.get('/', async (req: Request, res: Response) => {
     return;
   }
 
-  const { scope } = parsed.data;
+  const { scope, code } = parsed.data;
   const currentUid = req.user!.uid;
 
   try {
@@ -76,7 +79,7 @@ leaderboardRouter.get('/', async (req: Request, res: Response) => {
       const docs = snapshots.flatMap((s) => s.docs);
       entries = docs.map((doc) => toEntry(doc.id, doc.data()));
       entries.sort((a, b) => b.xp - a.xp);
-    } else {
+    } else if (scope === 'country') {
       // country scope — use language as proxy
       const currentDoc = await adminFirestore.collection('users').doc(currentUid).get();
       if (!currentDoc.exists) {
@@ -94,6 +97,28 @@ leaderboardRouter.get('/', async (req: Request, res: Response) => {
         .get();
 
       entries = snapshot.docs.map((doc) => toEntry(doc.id, doc.data()));
+    } else {
+      if (!code) {
+        res.status(400).json({ data: null, error: { message: 'Room code is required for room leaderboard' } });
+        return;
+      }
+
+      const room = await getRoom(code.toUpperCase());
+      if (!room) {
+        res.status(404).json({ data: null, error: { message: 'Room not found' } });
+        return;
+      }
+
+      const scores = await getRoomLeaderboardScores(room);
+      entries = room.players
+        .map((player) => ({
+          uid: player.userId ?? getParticipantKey(player),
+          nickname: player.nickname,
+          avatarUrl: player.avatarUrl,
+          xp: scores[player.id] ?? 0,
+          level: 'rookie',
+        }))
+        .sort((a, b) => b.xp - a.xp);
     }
 
     const ranked: LeaderboardEntry[] = entries.map((entry, i) => ({

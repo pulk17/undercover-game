@@ -1,7 +1,9 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
+import jwt from 'jsonwebtoken';
 import { adminFirestore } from '../lib/firebase';
 import { requireAuth } from '../middleware/auth';
+import { env } from '../env';
 
 export const profileRouter = Router();
 
@@ -11,6 +13,8 @@ const updateProfileSchema = z.object({
     .object({
       language: z.string().optional(),
       notifications: z.boolean().optional(),
+      hapticEnabled: z.boolean().optional(),
+      textScale: z.enum(['small', 'medium', 'large']).optional(),
     })
     .optional(),
 });
@@ -29,11 +33,17 @@ profileRouter.patch('/me', requireAuth, async (req: Request, res: Response) => {
   const uid = req.user!.uid;
 
   const updates: Record<string, unknown> = {};
-  if (displayName !== undefined) updates.displayName = displayName;
+  if (displayName !== undefined) {
+    updates.displayName = displayName;
+    updates.nickname = displayName;
+  }
   if (preferences !== undefined) {
     if (preferences.language !== undefined) updates['preferences.language'] = preferences.language;
     if (preferences.notifications !== undefined)
       updates['preferences.notifications'] = preferences.notifications;
+    if (preferences.hapticEnabled !== undefined)
+      updates['preferences.hapticEnabled'] = preferences.hapticEnabled;
+    if (preferences.textScale !== undefined) updates['preferences.textScale'] = preferences.textScale;
   }
 
   try {
@@ -43,10 +53,33 @@ profileRouter.patch('/me', requireAuth, async (req: Request, res: Response) => {
     const snap = await userRef.get();
     const data = snap.data() ?? {};
 
+    if (displayName !== undefined) {
+      const token = jwt.sign(
+        {
+          uid,
+          email: req.user?.email ?? null,
+          displayName,
+          photoURL: req.user?.photoURL ?? null,
+          isGuest: req.user?.isGuest ?? false,
+        },
+        env.JWT_SECRET,
+        { expiresIn: 30 * 24 * 60 * 60 },
+      );
+
+      res.cookie('session', token, {
+        httpOnly: true,
+        secure: env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 30 * 24 * 60 * 60 * 1000,
+        path: '/',
+      });
+    }
+
     res.json({
       data: {
         uid,
         displayName: (data.displayName as string | null) ?? null,
+        nickname: (data.nickname as string | null) ?? (data.displayName as string | null) ?? null,
         preferences: (data.preferences as Record<string, unknown>) ?? {},
       },
       error: null,

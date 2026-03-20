@@ -7,7 +7,7 @@
 
 /* ── CSS Variables ────────────────────────────────────────────────────────── */
 :root {
-  --bg: #08090d;
+  --bg: #000000;
   --surface: #12141c;
   --surface-low: #1a1b20;
   --surface-high: #292a2e;
@@ -31,8 +31,22 @@
     min-height: 100vh;
     -webkit-font-smoothing: antialiased;
   }
+  body {
+    overflow-x: hidden;
+  }
+  p,
+  h1,
+  h2,
+  h3,
+  span,
+  button,
+  label {
+    overflow-wrap: break-word;
+    word-break: normal;
+  }
   * {
     -webkit-tap-highlight-color: transparent;
+    box-sizing: border-box;
   }
 }
 
@@ -220,81 +234,52 @@ html[data-text-scale="medium"] { font-size: 16px; }
 html[data-text-scale="large"]  { font-size: 18px; }
 
 /* Scale inline-styled text proportionally */
-html[data-text-scale="small"]  [style*="fontSize: 14"] { font-size: 12px !important; }
-html[data-text-scale="small"]  [style*="fontSize: 15"] { font-size: 13px !important; }
-html[data-text-scale="small"]  [style*="fontSize: 28"] { font-size: 24px !important; }
-html[data-text-scale="small"]  [style*="fontSize: 22"] { font-size: 18px !important; }
+html[data-text-scale="small"]  [style*="font-size: 8px"] { font-size: 7px !important; }
+html[data-text-scale="small"]  [style*="font-size: 9px"] { font-size: 8px !important; }
+html[data-text-scale="small"]  [style*="font-size: 10px"] { font-size: 9px !important; }
+html[data-text-scale="small"]  [style*="font-size: 11px"] { font-size: 10px !important; }
+html[data-text-scale="small"]  [style*="font-size: 12px"] { font-size: 11px !important; }
+html[data-text-scale="small"]  [style*="font-size: 13px"] { font-size: 12px !important; }
+html[data-text-scale="small"]  [style*="font-size: 14px"] { font-size: 12px !important; }
+html[data-text-scale="small"]  [style*="font-size: 15px"] { font-size: 13px !important; }
+html[data-text-scale="small"]  [style*="font-size: 16px"] { font-size: 14px !important; }
+html[data-text-scale="small"]  [style*="font-size: 18px"] { font-size: 16px !important; }
+html[data-text-scale="small"]  [style*="font-size: 20px"] { font-size: 17px !important; }
+html[data-text-scale="small"]  [style*="font-size: 22px"] { font-size: 18px !important; }
+html[data-text-scale="small"]  [style*="font-size: 24px"] { font-size: 20px !important; }
+html[data-text-scale="small"]  [style*="font-size: 28px"] { font-size: 24px !important; }
+html[data-text-scale="small"]  [style*="font-size: 30px"] { font-size: 26px !important; }
+html[data-text-scale="small"]  [style*="font-size: 32px"] { font-size: 27px !important; }
+html[data-text-scale="small"]  [style*="font-size: 36px"] { font-size: 31px !important; }
+html[data-text-scale="small"]  [style*="font-size: 40px"] { font-size: 34px !important; }
+html[data-text-scale="small"]  [style*="font-size: 48px"] { font-size: 40px !important; }
+html[data-text-scale="small"]  [style*="font-size: 56px"] { font-size: 47px !important; }
+html[data-text-scale="small"]  [style*="font-size: 64px"] { font-size: 54px !important; }
 
-html[data-text-scale="large"]  [style*="fontSize: 14"] { font-size: 16px !important; }
-html[data-text-scale="large"]  [style*="fontSize: 15"] { font-size: 17px !important; }
-html[data-text-scale="large"]  [style*="fontSize: 28"] { font-size: 32px !important; }
-html[data-text-scale="large"]  [style*="fontSize: 22"] { font-size: 26px !important; }
+html[data-text-scale="large"]  [style*="font-size: 8px"] { font-size: 9px !important; }
+html[data-text-scale="large"]  [style*="font-size: 9px"] { font-size: 10px !important; }
+html[data-text-scale="large"]  [style*="font-size: 10px"] { font-size: 11px !important; }
+html[data-text-scale="large"]  [style*="font-size: 11px"] { font-size: 12px !important; }
+html[data-text-scale="large"]  [style*="font-size: 12px"] { font-size: 13px !important; }
+html[data-text-scale="large"]  [style*="font-size: 13px"] { font-size: 14px !important; }
+html[data-text-scale="large"]  [style*="font-size: 14px"] { font-size: 16px !important; }
+html[data-text-scale="large"]  [style*="font-size: 15px"] { font-size: 17px !important; }
+html[data-text-scale="large"]  [style*="font-size: 16px"] { font-size: 18px !important; }
+html[data-text-scale="large"]  [style*="font-size: 18px"] { font-size: 20px !important; }
+html[data-text-scale="large"]  [style*="font-size: 20px"] { font-size: 22px !important; }
+html[data-text-scale="large"]  [style*="font-size: 22px"] { font-size: 26px !important; }
+html[data-text-scale="large"]  [style*="font-size: 24px"] { font-size: 27px !important; }
+html[data-text-scale="large"]  [style*="font-size: 28px"] { font-size: 32px !important; }
+html[data-text-scale="large"]  [style*="font-size: 30px"] { font-size: 34px !important; }
+html[data-text-scale="large"]  [style*="font-size: 32px"] { font-size: 36px !important; }
+html[data-text-scale="large"]  [style*="font-size: 36px"] { font-size: 40px !important; }
+html[data-text-scale="large"]  [style*="font-size: 40px"] { font-size: 44px !important; }
+html[data-text-scale="large"]  [style*="font-size: 48px"] { font-size: 54px !important; }
+html[data-text-scale="large"]  [style*="font-size: 56px"] { font-size: 62px !important; }
+html[data-text-scale="large"]  [style*="font-size: 64px"] { font-size: 70px !important; }
 
-
-html.high-contrast {
-  --bg: #000000;
-  --surface: #111111;
-  --surface-low: #1a1a1a;
-  --surface-high: #333333;
-  --border: rgba(255, 255, 255, 0.5);
-  --text: #ffffff;
-  --muted: #cccccc;
-  --muted2: #dddddd;
-  --amber: #ffe000;
-  --amber-light: #ffee55;
-  --teal: #00ffcc;
-  --red: #ff4444;
-}
-
-html.high-contrast body,
-html.high-contrast #root {
+/* Force legacy inline backgrounds to use the pure black app background */
+[style*="background: #08090d"],
+[style*="background: rgb(8, 9, 13)"] {
   background: #000 !important;
-  color: #fff !important;
-}
-
-/* Force inline-styled backgrounds to use CSS vars */
-html.high-contrast [style*="background: #08090d"],
-html.high-contrast [style*="background: rgb(8, 9, 13)"] {
-  background: #000 !important;
-}
-html.high-contrast [style*="background: #12141c"],
-html.high-contrast [style*="background: rgb(18, 20, 28)"] {
-  background: #111 !important;
-}
-html.high-contrast [style*="color: #8c8a85"],
-html.high-contrast [style*="color: rgb(140, 138, 133)"] {
-  color: #ccc !important;
-}
-html.high-contrast [style*="color: #4a5068"],
-html.high-contrast [style*="color: rgb(74, 80, 104)"] {
-  color: #aaa !important;
-}
-html.high-contrast [style*="color: #e3e2e8"],
-html.high-contrast [style*="color: rgb(227, 226, 232)"] {
-  color: #fff !important;
-}
-
-html.high-contrast input,
-html.high-contrast textarea {
-  border-width: 2px !important;
-  border-color: #fff !important;
-  background: #111 !important;
-  color: #fff !important;
-}
-
-html.high-contrast .btn-primary {
-  background: #ffe000 !important;
-  color: #000 !important;
-  border: 2px solid #fff !important;
-}
-html.high-contrast .btn-secondary {
-  border: 2px solid #fff !important;
-  color: #fff !important;
-}
-html.high-contrast .btn-danger {
-  border: 2px solid #fff !important;
-}
-html.high-contrast .card {
-  background: #111 !important;
-  border: 2px solid rgba(255,255,255,0.5) !important;
 }

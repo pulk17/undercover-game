@@ -16,7 +16,19 @@ const DISTRIBUTION: Record<number, [number, number, number]> = {
   8:  [5, 2, 1],
   9:  [6, 2, 1],
   10: [7, 2, 1],
+  11: [7, 3, 1],
   12: [8, 3, 1],
+};
+
+const MODE_PLAYER_LIMITS: Record<GameMode, { min: number; max: number }> = {
+  classic: { min: 3, max: 12 },
+  speed_round: { min: 4, max: 12 },
+  team_mode: { min: 6, max: 12 },
+  secret_alliance: { min: 5, max: 10 },
+  double_agent: { min: 4, max: 8 },
+  reverse_mode: { min: 4, max: 10 },
+  mr_white_army: { min: 5, max: 12 },
+  tournament: { min: 3, max: 12 },
 };
 
 /** Fisher-Yates in-place shuffle */
@@ -29,6 +41,27 @@ function shuffle<T>(arr: T[]): T[] {
 }
 
 export class RoleDistributor {
+  static validateConfiguration(
+    playerCount: number,
+    mode: GameMode,
+    detectiveEnabled: boolean,
+  ): string | null {
+    if (mode === 'team_mode') {
+      return 'Team mode is not implemented yet';
+    }
+
+    const limits = MODE_PLAYER_LIMITS[mode];
+    if (playerCount < limits.min || playerCount > limits.max) {
+      return `${mode.replace(/_/g, ' ')} requires ${limits.min}-${limits.max} players`;
+    }
+
+    if (detectiveEnabled && playerCount < 4) {
+      return 'Detective mode requires at least 4 players';
+    }
+
+    return null;
+  }
+
   /**
    * Distribute roles to players.
    * Applies special mode overrides, then detective designation if enabled.
@@ -55,7 +88,7 @@ export class RoleDistributor {
     });
 
     // Detective designation: secretly mark one civilian as detective
-    if (detectiveEnabled) {
+    if (detectiveEnabled && n >= 4) {
       const civilianIndices = assignments
         .map((a, i) => (a.role === 'civilian' ? i : -1))
         .filter((i) => i !== -1);
@@ -76,6 +109,8 @@ export class RoleDistributor {
   private static buildRoles(n: number, mode: GameMode): Role[] {
     switch (mode) {
       case 'double_agent':
+        return RoleDistributor.buildDoubleAgentRoles(n);
+      case 'secret_alliance':
         return RoleDistributor.buildDoubleAgentRoles(n);
       case 'mr_white_army':
         return RoleDistributor.buildMrWhiteArmyRoles(n);

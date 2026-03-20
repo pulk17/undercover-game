@@ -11,6 +11,15 @@ const SPEED_ROUND_TIMER_SECONDS = 20;
 
 const activeTurnTimers = new Map<string, NodeJS.Timeout>();
 
+function shuffle<T>(items: T[]): T[] {
+  const copy = [...items];
+  for (let index = copy.length - 1; index > 0; index--) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [copy[index], copy[swapIndex]] = [copy[swapIndex], copy[index]];
+  }
+  return copy;
+}
+
 // ─── Pure helper ─────────────────────────────────────────────────────────────
 
 /**
@@ -206,7 +215,7 @@ export async function startCluePhase(
 
   if (gameState.activePlayers.length === 0) return;
 
-  // Turn order = activePlayers in their current order, index 0 first
+  gameState.activePlayers = shuffle(gameState.activePlayers);
   gameState.currentTurnPlayerId = gameState.activePlayers[0];
 
   // Set timer

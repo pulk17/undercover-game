@@ -1,6 +1,6 @@
 import type { Socket, Server } from 'socket.io';
 import type { GameConfig, Player } from '@undercover/shared';
-import { createRoom, joinRoom, leaveRoom, getRoom, saveRoom } from '../managers/RoomManager';
+import { createRoom, joinRoom, leaveRoom, getRoom, saveRoom, deleteRoom } from '../managers/RoomManager';
 import { generateQrDataUrl } from '../lib/qrcode';
 import { handleDisconnect, handleReconnect } from '../lib/reconnectionManager';
 
@@ -77,12 +77,91 @@ export function registerRoomHandlers(socket: Socket, io: Server): void {
     if (!code) return;
 
     try {
+      const room = await getRoom(code);
+      if (room && room.hostId === socket.id && room.players.length > 1) {
+        io.to(code).emit('room:closed', { reason: 'The host ended the room.' });
+        const sockets = await io.in(code).fetchSockets();
+        for (const memberSocket of sockets) {
+          memberSocket.leave(code);
+          memberSocket.data.roomCode = undefined;
+        }
+        await deleteRoom(code);
+        socket.emit('room:left', {});
+        return;
+      }
+
       await leaveRoom(code, socket.id, io);
       socket.leave(code);
       socket.data.roomCode = undefined;
       socket.emit('room:left', {});
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error';
+      socket.emit('room:error', { message });
+    }
+  });
+
+  // room:update_config
+  socket.on('room:update_config', async (payload: { config: GameConfig; passwordHash?: string | null }) => {
+    const code = socket.data.roomCode as string | undefined;
+    if (!code) return;
+
+    try {
+      const room = await getRoom(code);
+      if (!room) {
+        socket.emit('room:error', { message: 'Room not found' });
+        return;
+      }
+
+      if (room.hostId !== socket.id) {
+        socket.emit('room:error', { message: 'Only the host can update room settings' });
+        return;
+      }
+
+      if (room.phase !== 'lobby') {
+        socket.emit('room:error', { message: 'Room settings can only be changed in the lobby' });
+        return;
+      }
+
+      room.config = payload.config;
+      if (payload.passwordHash !== undefined) {
+        room.passwordHash = payload.passwordHash;
+      }
+      room.lastActivityAt = Date.now();
+
+      await saveRoom(room);
+      io.to(code).emit('room:updated', { room });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      socket.emit('room:error', { message });
+    }
+  });
+
+  socket.on('profile:update_identity', async ({ displayName }: { displayName: string }) => {
+    const nextName = displayName.trim().slice(0, 12);
+    if (!nextName) return;
+
+    socket.data.user = {
+      ...socket.data.user,
+      displayName: nextName,
+    };
+
+    const code = socket.data.roomCode as string | undefined;
+    if (!code) return;
+
+    try {
+      const room = await getRoom(code);
+      if (!room) return;
+
+      const player = room.players.find((entry) => entry.id === socket.id);
+      if (!player) return;
+
+      player.nickname = nextName;
+      room.lastActivityAt = Date.now();
+
+      await saveRoom(room);
+      io.to(code).emit('room:updated', { room });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to sync player identity';
       socket.emit('room:error', { message });
     }
   });

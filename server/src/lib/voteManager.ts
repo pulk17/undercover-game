@@ -6,6 +6,7 @@ import { toPublicGameState } from '../handlers/gameHandlers';
 
 const GAME_TTL = 60 * 60 * 24; // 24 hours
 const VOTE_PHASE_DURATION_MS = 30_000; // 30 seconds
+const ELIMINATION_REVEAL_DELAY_MS = 2_500;
 
 // ─── Active vote timers ───────────────────────────────────────────────────────
 
@@ -152,13 +153,10 @@ export async function revealVotes(
     return;
   }
 
-  // 9. Set eliminatedThisRound and transition to elimination phase
-  gameState.eliminatedThisRound = eliminatedPlayerId;
-  gameState.phase = 'elimination';
-  gameState.phaseEndsAt = null;
+  if (!eliminatedPlayerId) return;
 
-  // 10. Persist to Redis
-  await redis.set(`game:${roomCode}`, JSON.stringify(gameState), { ex: GAME_TTL });
+  // 9. Transition into the elimination reveal and then resolve it server-side
+  await scheduleEliminationResolution(roomCode, gameState, eliminatedPlayerId, io);
 }
 
 /**
@@ -229,14 +227,50 @@ async function resolveTie(
     const randomIndex = Math.floor(Math.random() * tiedPlayers.length);
     const chosen = tiedPlayers[randomIndex]!;
 
-    gameState.eliminatedThisRound = chosen;
-    gameState.phase = 'elimination';
-    gameState.phaseEndsAt = null;
-
-    await redis.set(`game:${roomCode}`, JSON.stringify(gameState), { ex: GAME_TTL });
-
     // Notify clients of the random pick
     io.to(roomCode).emit('game:tie_broken', { eliminatedPlayerId: chosen, strategy: 'random' });
+    await scheduleEliminationResolution(roomCode, gameState, chosen, io);
     return;
   }
+}
+
+async function scheduleEliminationResolution(
+  roomCode: string,
+  gameState: GameState,
+  eliminatedPlayerId: string,
+  io: Server,
+): Promise<void> {
+  gameState.eliminatedThisRound = eliminatedPlayerId;
+  gameState.phase = 'elimination';
+  gameState.phaseEndsAt = Date.now() + ELIMINATION_REVEAL_DELAY_MS;
+
+  await redis.set(`game:${roomCode}`, JSON.stringify(gameState), { ex: GAME_TTL });
+
+  const publicState = toPublicGameState(gameState);
+  io.to(roomCode).emit('game:phase_changed', { phase: 'elimination', state: publicState });
+
+  setTimeout(async () => {
+    try {
+      const [rawState, room] = await Promise.all([
+        redis.get<string>(`game:${roomCode}`),
+        getRoom(roomCode),
+      ]);
+      if (!rawState || !room) return;
+
+      const latestState: GameState =
+        typeof rawState === 'string' ? JSON.parse(rawState) : (rawState as GameState);
+
+      if (
+        latestState.phase !== 'elimination' ||
+        latestState.eliminatedThisRound !== eliminatedPlayerId
+      ) {
+        return;
+      }
+
+      const { eliminatePlayer } = await import('./eliminationManager');
+      await eliminatePlayer(io, roomCode, latestState, eliminatedPlayerId, room);
+    } catch {
+      // best-effort; reveal timers should never crash the server
+    }
+  }, ELIMINATION_REVEAL_DELAY_MS);
 }

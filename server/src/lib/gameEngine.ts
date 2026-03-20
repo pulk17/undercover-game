@@ -15,7 +15,7 @@ export function getActiveRoles(
  *
  * Evaluates win conditions in priority order:
  *  1. Undercover wins  — undercoverCount >= activePlayers.length / 2
- *  2. Mr. White wins   — Mr. White is active and only 1 or 3 players remain
+ *  2. Mr. White wins   — Mr. White is the last active player standing
  *  3. Civilians win    — no active undercover or mr_white players remain
  *  4. null             — game continues
  */
@@ -34,9 +34,9 @@ export function evaluateWinCondition(
     return 'undercover';
   }
 
-  // 2. Mr. White wins when they are the last player standing,
-  //    or when exactly 3 players remain and Mr. White is among them
-  if (mrWhiteCount > 0 && (activePlayers.length === 1 || activePlayers.length === 3)) {
+  // 2. Mr. White only wins passively when they are the last player standing.
+  //    Final-confrontation guess windows are handled by the elimination flow.
+  if (mrWhiteCount > 0 && activePlayers.length === 1) {
     return 'mr_white';
   }
 

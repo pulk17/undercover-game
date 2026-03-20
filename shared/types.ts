@@ -37,6 +37,8 @@ export type Level =
   | 'mastermind'
   | 'phantom';
 
+export type TextScale = 'small' | 'medium' | 'large';
+
 // ─── Core Entities ────────────────────────────────────────────────────────────
 
 export interface WordPair {
@@ -123,9 +125,9 @@ export interface GameState {
 
 export interface UserPreferences {
   language: string;
-  highContrast: boolean;
-  textScale: number;
+  textScale: TextScale;
   hapticEnabled: boolean;
+  notifications: boolean;
 }
 
 export interface AuthUser {

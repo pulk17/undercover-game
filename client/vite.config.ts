@@ -6,9 +6,14 @@ import path from 'path';
 // Suppress noisy proxy ECONNREFUSED logs during server cold-start
 const logger = createLogger();
 const _warn = logger.warn.bind(logger);
+const _error = logger.error.bind(logger);
 logger.warn = (msg, opts) => {
-  if (msg.includes('ECONNREFUSED') || msg.includes('http proxy error')) return;
+  if (msg.includes('ECONNREFUSED') || msg.includes('proxy error') || msg.includes('ws proxy')) return;
   _warn(msg, opts);
+};
+logger.error = (msg, opts) => {
+  if (msg.includes('ECONNREFUSED') || msg.includes('proxy error') || msg.includes('ws proxy')) return;
+  _error(msg, opts);
 };
 
 export default defineConfig({

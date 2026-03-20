@@ -80,6 +80,10 @@ export default function ProfileScreen() {
       setAddError('All fields are required');
       return;
     }
+    if (addForm.wordA.trim().toLowerCase() === addForm.wordB.trim().toLowerCase()) {
+      setAddError('Word A and Word B must be different');
+      return;
+    }
     setAddLoading(true);
     setAddError('');
     try {
@@ -109,17 +113,22 @@ export default function ProfileScreen() {
   }
 
   async function handleDeleteWord(id: string) {
+    const previous = customWords;
     setCustomWords((prev) => prev.filter((w) => w.id !== id));
     try {
-      await fetch(`${BASE}/profile/me/words/${id}`, { method: 'DELETE', credentials: 'include' });
+      const response = await fetch(`${BASE}/profile/me/words/${id}`, { method: 'DELETE', credentials: 'include' });
+      if (!response.ok) {
+        throw new Error('Delete failed');
+      }
     } catch {
+      setCustomWords(previous);
       void fetchCustomWords();
     }
   }
 
   if (!user) {
     return (
-      <div style={{ minHeight: '100vh', background: '#08090d', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, padding: '0 20px' }}>
+      <div style={{ minHeight: '100vh', background: '#000', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, padding: '0 20px' }}>
         <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 12, color: '#4a5068', letterSpacing: '0.1em' }}>SIGN IN TO VIEW PROFILE</p>
         <button onClick={() => navigate('/lobby')} className="btn-secondary" style={{ maxWidth: 200 }}>BACK TO LOBBY</button>
       </div>
@@ -154,7 +163,7 @@ export default function ProfileScreen() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: '#08090d', color: '#e3e2e8', padding: '20px 20px 100px', maxWidth: 480, margin: '0 auto' }}>
+    <div style={{ minHeight: '100vh', background: '#000', color: '#e3e2e8', padding: '20px 20px 100px', maxWidth: 480, margin: '0 auto' }}>
       <button onClick={() => navigate(-1)} style={{ background: 'none', border: 'none', color: '#8c8a85', fontFamily: 'IBM Plex Mono, monospace', fontSize: 12, cursor: 'pointer', marginBottom: 24, padding: 0, letterSpacing: '0.1em' }}>
         BACK
       </button>
@@ -205,7 +214,16 @@ export default function ProfileScreen() {
             const unlocked = unlockedSet.has(ach.id);
             return (
               <motion.div key={ach.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 + idx * 0.04 }} style={{ background: unlocked ? 'rgba(232,197,71,0.06)' : '#12141c', border: `1px solid ${unlocked ? 'rgba(232,197,71,0.2)' : 'rgba(255,255,255,0.07)'}`, borderRadius: 12, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)' }}>
-                <span style={{ fontSize: 18, opacity: unlocked ? 1 : 0.3 }}>{unlocked ? 'STAR' : 'O'}</span>
+                <span
+                  style={{
+                    width: 18,
+                    height: 18,
+                    borderRadius: 999,
+                    background: unlocked ? '#e8c547' : 'rgba(255,255,255,0.06)',
+                    border: `1px solid ${unlocked ? 'rgba(232,197,71,0.45)' : 'rgba(255,255,255,0.08)'}`,
+                    flexShrink: 0,
+                  }}
+                />
                 <span style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, color: unlocked ? '#e3e2e8' : '#4a5068', letterSpacing: '0.05em', lineHeight: 1.3 }}>{ach.name}</span>
               </motion.div>
             );

@@ -10,15 +10,16 @@
  */
 import { describe, it, expect } from 'vitest';
 import * as fc from 'fast-check';
-import type { AuthUser, Level } from '@undercover/shared';
+import type { AuthUser, Level, TextScale } from '@undercover/shared';
 
 const LEVELS: Level[] = ['rookie', 'agent', 'operative', 'infiltrator', 'mastermind', 'phantom'];
+const TEXT_SCALES: TextScale[] = ['small', 'medium', 'large'];
 
 const userPreferencesArb = fc.record({
   language: fc.constantFrom('en', 'fr', 'es', 'de', 'ar'),
-  highContrast: fc.boolean(),
-  textScale: fc.float({ min: Math.fround(0.8), max: Math.fround(2.0) }),
+  textScale: fc.constantFrom(...TEXT_SCALES) as fc.Arbitrary<TextScale>,
   hapticEnabled: fc.boolean(),
+  notifications: fc.boolean(),
 });
 
 const authUserArb: fc.Arbitrary<AuthUser> = fc.record({

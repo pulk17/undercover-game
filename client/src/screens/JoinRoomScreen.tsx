@@ -1,70 +1,91 @@
-import { useRef, useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useRoomStore } from '../stores/roomStore';
 
-async function hashPassword(password: string): Promise<string> {
+const CELL_COUNT = 6;
+
+async function hashPassword(password: string): Promise<string | null> {
+  if (!password) return null;
+  if (!crypto?.subtle) {
+    throw new Error('Secure password hashing is unavailable in this browser.');
+  }
+
   const encoder = new TextEncoder();
   const data = encoder.encode(password);
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+  return hashArray.map((value) => value.toString(16).padStart(2, '0')).join('');
 }
-
-const CELL_COUNT = 6;
 
 export default function JoinRoomScreen() {
   const navigate = useNavigate();
   const { code: urlCode } = useParams<{ code?: string }>();
-  const { joinRoom, error } = useRoomStore();
+  const { joinRoom, error, isConnected } = useRoomStore();
 
   const [cells, setCells] = useState<string[]>(() => {
-    const pre = (urlCode ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, CELL_COUNT).split('');
-    return [...pre, ...Array(CELL_COUNT - pre.length).fill('')];
+    const prefilled = (urlCode ?? '')
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, '')
+      .slice(0, CELL_COUNT)
+      .split('');
+    return [...prefilled, ...Array(CELL_COUNT - prefilled.length).fill('')];
   });
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   const code = cells.join('');
-  const allFilled = code.length === CELL_COUNT;
+  const allFilled = cells.every((cell) => cell.length === 1);
 
   useEffect(() => {
-    inputRefs.current[0]?.focus();
-  }, []);
+    const firstEmptyIndex = cells.findIndex((cell) => cell === '');
+    const focusIndex = firstEmptyIndex >= 0 ? firstEmptyIndex : CELL_COUNT - 1;
+    inputRefs.current[focusIndex]?.focus();
+  }, [cells]);
 
-  function handleCellChange(idx: number, val: string) {
-    const char = val.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(-1);
+  function handleCellChange(index: number, value: string) {
+    const char = value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(-1);
     const next = [...cells];
-    next[idx] = char;
+    next[index] = char;
     setCells(next);
-    if (char && idx < CELL_COUNT - 1) {
-      inputRefs.current[idx + 1]?.focus();
+
+    if (char && index < CELL_COUNT - 1) {
+      inputRefs.current[index + 1]?.focus();
     }
   }
 
-  function handleKeyDown(idx: number, e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Backspace' && !cells[idx] && idx > 0) {
-      inputRefs.current[idx - 1]?.focus();
+  function handleKeyDown(index: number, event: React.KeyboardEvent<HTMLInputElement>) {
+    if (event.key === 'Backspace' && !cells[index] && index > 0) {
+      inputRefs.current[index - 1]?.focus();
     }
   }
 
-  function handlePaste(e: React.ClipboardEvent) {
-    e.preventDefault();
-    const pasted = e.clipboardData.getData('text').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, CELL_COUNT);
-    const next = [...cells];
-    pasted.split('').forEach((c, i) => { next[i] = c; });
+  function handlePaste(event: React.ClipboardEvent) {
+    event.preventDefault();
+    const pasted = event.clipboardData
+      .getData('text')
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, '')
+      .slice(0, CELL_COUNT);
+
+    const next = Array.from({ length: CELL_COUNT }, () => '');
+    pasted.split('').forEach((char, index) => {
+      next[index] = char;
+    });
     setCells(next);
-    const focusIdx = Math.min(pasted.length, CELL_COUNT - 1);
-    inputRefs.current[focusIdx]?.focus();
+
+    const focusIndex = Math.min(pasted.length, CELL_COUNT - 1);
+    inputRefs.current[focusIndex]?.focus();
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!allFilled || submitting) return;
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!allFilled || submitting || !isConnected) return;
+
     setSubmitting(true);
     try {
-      const passwordHash = password ? await hashPassword(password) : null;
+      const passwordHash = await hashPassword(password);
       await joinRoom(code, passwordHash);
       navigate('/lobby');
     } finally {
@@ -73,87 +94,119 @@ export default function JoinRoomScreen() {
   }
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: '#08090d',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '0 24px',
-      paddingBottom: 80,
-    }}>
+    <div
+      style={{
+        minHeight: '100vh',
+        background: '#000',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '0 24px',
+        paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 88px)',
+      }}
+    >
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, ease: 'easeOut' }}
         style={{ width: '100%', maxWidth: 360 }}
       >
-        {/* Header */}
         <button
           onClick={() => navigate(-1)}
-          style={{ background: 'none', border: 'none', color: '#8c8a85', fontFamily: 'IBM Plex Mono, monospace', fontSize: 12, cursor: 'pointer', marginBottom: 32, padding: 0, letterSpacing: '0.1em' }}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: '#8c8a85',
+            fontFamily: 'IBM Plex Mono, monospace',
+            fontSize: 12,
+            cursor: 'pointer',
+            marginBottom: 32,
+            padding: 0,
+            letterSpacing: '0.1em',
+          }}
         >
-          ← BACK
+          BACK
         </button>
 
-        <p className="label-mono" style={{ marginBottom: 8 }}>ENTER CODE</p>
-        <h1 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 22, color: '#e3e2e8', margin: '0 0 32px' }}>
+        <p className="label-mono" style={{ marginBottom: 8 }}>
+          Enter Code
+        </p>
+        <h1 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 22, color: '#e3e2e8', margin: '0 0 12px' }}>
           Join Room
         </h1>
+        <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 11, color: '#8c8a85', margin: '0 0 28px', lineHeight: 1.6 }}>
+          Type the six-character room code exactly as it appears on the host device.
+        </p>
 
         <form onSubmit={handleSubmit}>
-          {/* 6-cell code input */}
-          <div style={{ display: 'flex', gap: 8, marginBottom: 32, justifyContent: 'center' }} onPaste={handlePaste}>
-            {cells.map((cell, idx) => {
-              const isFocused = false; // managed by browser
-              return (
-                <input
-                  key={idx}
-                  ref={(el) => { inputRefs.current[idx] = el; }}
-                  type="text"
-                  inputMode="text"
-                  maxLength={1}
-                  value={cell}
-                  onChange={(e) => handleCellChange(idx, e.target.value)}
-                  onKeyDown={(e) => handleKeyDown(idx, e)}
-                  style={{
-                    width: 44,
-                    height: 56,
-                    flexShrink: 0,
-                    background: '#12141c',
-                    border: `1px solid ${cell ? 'rgba(232,197,71,0.5)' : 'rgba(255,255,255,0.07)'}`,
-                    borderRadius: 12,
-                    textAlign: 'center',
-                    fontFamily: 'IBM Plex Mono, monospace',
-                    fontSize: 22,
-                    fontWeight: 600,
-                    color: '#e3e2e8',
-                    outline: 'none',
-                    textTransform: 'uppercase',
-                    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
-                    transition: 'border-color 150ms ease',
-                  }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.borderColor = '#e8c547';
-                    e.currentTarget.style.boxShadow = '0 0 0 2px rgba(232,197,71,0.2), inset 0 1px 0 rgba(255,255,255,0.06)';
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = cell ? 'rgba(232,197,71,0.5)' : 'rgba(255,255,255,0.07)';
-                    e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.06)';
-                  }}
-                />
-              );
-            })}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 28, justifyContent: 'center' }} onPaste={handlePaste}>
+            {cells.map((cell, index) => (
+              <input
+                key={index}
+                ref={(element) => {
+                  inputRefs.current[index] = element;
+                }}
+                type="text"
+                inputMode="text"
+                maxLength={1}
+                value={cell}
+                onChange={(event) => handleCellChange(index, event.target.value)}
+                onKeyDown={(event) => handleKeyDown(index, event)}
+                aria-label={`Room code character ${index + 1}`}
+                style={{
+                  width: 44,
+                  height: 56,
+                  flexShrink: 0,
+                  background: '#12141c',
+                  border: `1px solid ${cell ? 'rgba(232,197,71,0.5)' : 'rgba(255,255,255,0.07)'}`,
+                  borderRadius: 12,
+                  textAlign: 'center',
+                  fontFamily: 'IBM Plex Mono, monospace',
+                  fontSize: 22,
+                  fontWeight: 600,
+                  color: '#e3e2e8',
+                  outline: 'none',
+                  textTransform: 'uppercase',
+                  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
+                  transition: 'border-color 150ms ease',
+                }}
+                onFocus={(event) => {
+                  event.currentTarget.style.borderColor = '#e8c547';
+                  event.currentTarget.style.boxShadow = '0 0 0 2px rgba(232,197,71,0.2), inset 0 1px 0 rgba(255,255,255,0.06)';
+                }}
+                onBlur={(event) => {
+                  event.currentTarget.style.borderColor = cell ? 'rgba(232,197,71,0.5)' : 'rgba(255,255,255,0.07)';
+                  event.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.06)';
+                }}
+              />
+            ))}
           </div>
 
-          {/* Optional password */}
+          {!isConnected && (
+            <div
+              style={{
+                marginBottom: 16,
+                background: 'rgba(232,75,75,0.08)',
+                border: '1px solid rgba(232,75,75,0.18)',
+                borderRadius: 12,
+                padding: '10px 12px',
+              }}
+            >
+              <p style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, color: '#e84b4b', margin: 0, lineHeight: 1.5 }}>
+                Waiting for the server connection before joining.
+              </p>
+            </div>
+          )}
+
           <div style={{ marginBottom: 24 }}>
-            <p className="label-mono" style={{ marginBottom: 8 }}>PASSWORD (OPTIONAL)</p>
+            <p className="label-mono" style={{ marginBottom: 8 }}>
+              Password (Optional)
+            </p>
             <input
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(event) => setPassword(event.target.value)}
               placeholder="Leave blank if none"
               style={{
                 width: '100%',
@@ -169,8 +222,12 @@ export default function JoinRoomScreen() {
                 boxSizing: 'border-box',
                 boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
               }}
-              onFocus={(e) => { e.currentTarget.style.borderColor = '#e8c547'; }}
-              onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'; }}
+              onFocus={(event) => {
+                event.currentTarget.style.borderColor = '#e8c547';
+              }}
+              onBlur={(event) => {
+                event.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)';
+              }}
             />
           </div>
 
@@ -180,12 +237,8 @@ export default function JoinRoomScreen() {
             </p>
           )}
 
-          <button
-            type="submit"
-            disabled={!allFilled || submitting}
-            className="btn-primary"
-          >
-            {submitting ? 'JOINING…' : 'ENTER CODE →'}
+          <button type="submit" disabled={!allFilled || submitting || !isConnected} className="btn-primary">
+            {submitting ? 'Joining...' : 'Join Room'}
           </button>
         </form>
 

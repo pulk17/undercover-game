@@ -1,13 +1,8 @@
 /**
- * Property test P15: Mr. White win condition at three players
+ * Property test P15: Mr. White passive win condition
  *
- * Mr. White wins when:
- *   - mrWhiteCount > 0
- *   - AND (activePlayers.length === 1 OR activePlayers.length === 3)
- *   - AND undercover win condition does NOT fire first
- *     (undercoverCount < activePlayers.length / 2)
- *
- * Validates: Requirements P15
+ * Mr. White wins passively only when they are the last active player.
+ * Final-3 states continue into the dedicated guess flow instead.
  */
 import { describe, it, expect } from 'vitest';
 import * as fc from 'fast-check';
@@ -24,10 +19,7 @@ const uniqueIds = (count: number): fc.Arbitrary<string[]> =>
     .filter((ids) => ids.length === count);
 
 describe('P15: Mr. White win condition', () => {
-  it('returns "mr_white" when Mr. White is active and exactly 3 players remain (undercover minority)', () => {
-    // 3 players: 1 Mr. White + 1 civilian + 1 civilian
-    // undercoverCount = 0 < 3/2 = 1.5 → undercover win does NOT fire
-    // mrWhiteCount = 1 > 0, activePlayers.length === 3 → mr_white wins
+  it('does not return "mr_white" when Mr. White is active and exactly 3 players remain', () => {
     fc.assert(
       fc.property(
         uniqueIds(3),
@@ -39,7 +31,7 @@ describe('P15: Mr. White win condition', () => {
           };
 
           const result = evaluateWinCondition(ids, playerRoles);
-          expect(result).toBe('mr_white');
+          expect(result).toBeNull();
         },
       ),
       { numRuns: 100 },
@@ -63,12 +55,12 @@ describe('P15: Mr. White win condition', () => {
     );
   });
 
-  it('does not return "mr_white" when Mr. White is active but player count is not 1 or 3', () => {
-    // Use player counts that are NOT 1 or 3 and where undercover doesn't win
+  it('does not return "mr_white" when Mr. White is active but player count is not 1', () => {
+    // Use player counts that are NOT 1 and where undercover doesn't win
     fc.assert(
       fc.property(
-        // Pick a count from {2, 4, 5, 6, 7, 8, 9, 10, 11, 12}
-        fc.constantFrom(2, 4, 5, 6, 7, 8, 9, 10, 11, 12).chain((total) =>
+        // Pick a count from {2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}
+        fc.constantFrom(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12).chain((total) =>
           uniqueIds(total).map((ids) => ({ ids, total })),
         ),
         ({ ids, total }) => {
