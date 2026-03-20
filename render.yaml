@@ -3,8 +3,8 @@ services:
   name: undercover-game-server
   runtime: node
   rootDir: server
-  buildCommand: cd server && npm install --include=dev && npm run build
-  startCommand: node server/dist/index.js
+  buildCommand: npm install --include=dev && npm run build
+  startCommand: cd .. && node server/dist/index.js
   healthCheckPath: /api/v1/health
   envVars:
   - key: NODE_ENV
