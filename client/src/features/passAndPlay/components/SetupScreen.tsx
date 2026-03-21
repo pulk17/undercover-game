@@ -191,6 +191,24 @@ export default function SetupScreen({ onStart }: SetupScreenProps) {
           Pass & Play Setup
         </h1>
         
+        <div style={{
+          background: 'rgba(155, 111, 232, 0.1)',
+          border: '1px solid rgba(155, 111, 232, 0.3)',
+          borderRadius: 8,
+          padding: '12px 16px',
+          marginBottom: 16,
+        }}>
+          <p style={{
+            fontFamily: 'IBM Plex Mono, monospace',
+            fontSize: 10,
+            color: '#9b6fe8',
+            margin: 0,
+            letterSpacing: '0.05em',
+          }}>
+            ✓ OFFLINE MODE - No internet required after setup
+          </p>
+        </div>
+        
         <p style={{
           fontFamily: 'IBM Plex Mono, monospace',
           fontSize: 11,

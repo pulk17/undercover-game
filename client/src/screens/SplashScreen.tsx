@@ -72,7 +72,7 @@ export default function SplashScreen({ onDone }: { onDone: () => void }) {
         <h1 style={{
           fontFamily: 'Syne, sans-serif',
           fontWeight: 800,
-          fontSize: 40,
+          fontSize: 'clamp(32px, 8vw, 40px)',
           color: '#e3e2e8',
           letterSpacing: '-0.03em',
           lineHeight: 1,
@@ -84,11 +84,12 @@ export default function SplashScreen({ onDone }: { onDone: () => void }) {
         <div style={{ width: 40, height: 1, background: 'rgba(255,255,255,0.3)' }} />
         <p style={{
           fontFamily: 'IBM Plex Mono, monospace',
-          fontSize: 10,
+          fontSize: 'clamp(8px, 2vw, 10px)',
           letterSpacing: '0.2em',
           color: '#4a5068',
           textTransform: 'uppercase',
           margin: 0,
+          whiteSpace: 'nowrap',
         }}>
           WHO IS THE SPY?
         </p>

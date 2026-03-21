@@ -74,6 +74,9 @@ export default function App() {
   }, [location.pathname]);
 
   useEffect(() => {
+    // Don't interfere with the new Pass & Play mode at all
+    if (location.pathname.startsWith('/play/local')) return;
+    
     if (!isLocalMode) return;
 
     if (handoffPlayer) {

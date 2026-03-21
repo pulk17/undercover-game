@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { usePassAndPlayStore } from './store/passAndPlayStore';
+import { useLocalGameStore } from '../../stores/localGameStore';
 import { usePrivacyGuard } from './hooks/usePrivacyGuard';
 import { usePnPNavGuard } from './hooks/usePnPNavGuard';
 import SetupScreen from './components/SetupScreen';
@@ -26,6 +27,12 @@ export default function PassAndPlayGame() {
   const [resumeDialogShown, setResumeDialogShown] = useState(false);
 
   console.log('[PassAndPlayGame] Rendered with phase:', phase, 'revealSubPhase:', revealSubPhase);
+
+  // Clear old local game store to prevent conflicts
+  const { reset: resetOldLocalGame } = useLocalGameStore();
+  useEffect(() => {
+    resetOldLocalGame();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const privacyGuard = usePrivacyGuard(phase, revealSubPhase);
 
