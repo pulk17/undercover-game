@@ -114,6 +114,24 @@ export default function SplashScreen({ onDone }: { onDone: () => void }) {
           JOIN ROOM
         </button>
         <button
+          onClick={() => { onDone(); navigate('/play/local'); }}
+          style={{
+            width: '100%',
+            padding: '12px 16px',
+            background: 'rgba(155, 111, 232, 0.1)',
+            border: '1px solid rgba(155, 111, 232, 0.3)',
+            borderRadius: 8,
+            color: '#9b6fe8',
+            fontFamily: 'IBM Plex Mono, monospace',
+            fontSize: 12,
+            fontWeight: 600,
+            letterSpacing: '0.1em',
+            cursor: 'pointer',
+          }}
+        >
+          PASS & PLAY
+        </button>
+        <button
           onClick={() => { onDone(); navigate('/how-to-play'); }}
           style={{
             background: 'none',

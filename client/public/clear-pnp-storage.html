@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Clear Pass & Play Storage</title>
+  <style>
+    body {
+      font-family: monospace;
+      background: #08090d;
+      color: #e3e2e8;
+      padding: 40px;
+      text-align: center;
+    }
+    button {
+      padding: 16px 32px;
+      background: #e8c547;
+      border: none;
+      border-radius: 8px;
+      color: #08090d;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      margin: 10px;
+    }
+    .result {
+      margin-top: 20px;
+      padding: 20px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Pass & Play Debug Tool</h1>
+  <p>Use this to clear cached game state and force a fresh start</p>
+  
+  <button onclick="clearStorage()">Clear Pass & Play Storage</button>
+  <button onclick="clearAll()">Clear All LocalStorage</button>
+  <button onclick="showStorage()">Show Current Storage</button>
+  
+  <div id="result" class="result"></div>
+  
+  <script>
+    function clearStorage() {
+      localStorage.removeItem('pnp_game_state');
+      document.getElementById('result').innerHTML = '✓ Pass & Play storage cleared!<br>Refresh the app to start fresh.';
+    }
+    
+    function clearAll() {
+      localStorage.clear();
+      document.getElementById('result').innerHTML = '✓ All localStorage cleared!<br>Refresh the app to start fresh.';
+    }
+    
+    function showStorage() {
+      const pnpState = localStorage.getItem('pnp_game_state');
+      if (pnpState) {
+        try {
+          const parsed = JSON.parse(pnpState);
+          document.getElementById('result').innerHTML = 
+            '<strong>Current State:</strong><br>' +
+            'Phase: ' + parsed.phase + '<br>' +
+            'Players: ' + (parsed.players?.length || 0) + '<br>' +
+            'Round: ' + parsed.currentRound + '<br>' +
+            '<pre style="text-align: left; overflow: auto;">' + 
+            JSON.stringify(parsed, null, 2) + 
+            '</pre>';
+        } catch (e) {
+          document.getElementById('result').innerHTML = 'Error parsing state: ' + e.message;
+        }
+      } else {
+        document.getElementById('result').innerHTML = 'No Pass & Play state found in storage.';
+      }
+    }
+  </script>
+</body>
+</html>

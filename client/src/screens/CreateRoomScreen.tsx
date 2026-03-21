@@ -4,6 +4,39 @@ import { motion } from 'framer-motion';
 import { useRoomStore } from '../stores/roomStore';
 import { env } from '../env';
 import type { Difficulty, GameConfig, GameMode } from '../../../shared/types';
+import {
+  TargetIcon,
+  ZapIcon,
+  HandshakeIcon,
+  MasksIcon,
+  RefreshIcon,
+  UsersIcon,
+  TrophyIcon,
+  GlobeIcon,
+  PawIcon,
+  TvIcon,
+  BrainIcon,
+  FilmIcon,
+  BuildingIcon,
+  MapIcon,
+  SwordsIcon,
+  UtensilsIcon,
+  ScrollIcon,
+  PartyPopperIcon,
+  BriefcaseIcon,
+  LanguagesIcon,
+  ClapperboardIcon,
+  MusicIcon,
+  SparklesIcon,
+  LeafIcon,
+  BookOpenIcon,
+  FlaskIcon,
+  RocketIcon,
+  FootballIcon,
+  LaptopIcon,
+  PlaneIcon,
+  CookingPotIcon,
+} from '../components/Icons';
 
 const defaultConfig: GameConfig = {
   mode: 'classic',
@@ -22,29 +55,45 @@ const defaultConfig: GameConfig = {
 const MODE_OPTIONS: Array<{
   value: GameMode;
   label: string;
-  badge: string;
+  Icon: React.ComponentType<{ size?: number; color?: string }>;
   desc: string;
 }> = [
-  { value: 'classic', label: 'Classic', badge: 'C', desc: 'Standard rules and pacing' },
-  { value: 'speed_round', label: 'Speed', badge: 'SR', desc: 'Short timers and fast rounds' },
-  { value: 'secret_alliance', label: 'Alliance', badge: 'SA', desc: 'Two allied undercover players' },
-  { value: 'double_agent', label: 'Double Agent', badge: 'DA', desc: 'Two undercover players' },
-  { value: 'reverse_mode', label: 'Reverse', badge: 'RV', desc: 'Undercover majority mode' },
-  { value: 'mr_white_army', label: 'White Army', badge: 'MW', desc: 'Multiple Mr. Whites' },
-  { value: 'tournament', label: 'Tournament', badge: 'T', desc: 'Carry points across rematches' },
+  { value: 'classic', label: 'Classic', Icon: TargetIcon, desc: 'Standard rules and pacing' },
+  { value: 'speed_round', label: 'Speed', Icon: ZapIcon, desc: 'Short timers and fast rounds' },
+  { value: 'secret_alliance', label: 'Alliance', Icon: HandshakeIcon, desc: 'Two allied undercover players' },
+  { value: 'double_agent', label: 'Double Agent', Icon: MasksIcon, desc: 'Two undercover players' },
+  { value: 'reverse_mode', label: 'Reverse', Icon: RefreshIcon, desc: 'Undercover majority mode' },
+  { value: 'mr_white_army', label: 'White Army', Icon: UsersIcon, desc: 'Multiple Mr. Whites' },
+  { value: 'tournament', label: 'Tournament', Icon: TrophyIcon, desc: 'Carry points across rematches' },
 ];
 
-const CATEGORY_ICONS: Record<string, string> = {
-  general: 'GEN',
-  food: 'FOOD',
-  travel: 'TRVL',
-  cinema: 'MOV',
-  sports: 'SPRT',
-  tech: 'TECH',
-  nature: 'NAT',
-  music: 'MUS',
-  history: 'HIS',
-  science: 'SCI',
+const CATEGORY_ICON_MAP: Record<string, React.ComponentType<{ size?: number; color?: string }>> = {
+  general: GlobeIcon,
+  animals: PawIcon,
+  animated_shows: TvIcon,
+  brainrot: BrainIcon,
+  childhood_movies: FilmIcon,
+  cities: BuildingIcon,
+  countries: MapIcon,
+  famous_rivalries: SwordsIcon,
+  food: UtensilsIcon,
+  history: ScrollIcon,
+  holidays: PartyPopperIcon,
+  indian_breakfast: CookingPotIcon,
+  indian_fast_food: CookingPotIcon,
+  jobs: BriefcaseIcon,
+  languages: LanguagesIcon,
+  movies: ClapperboardIcon,
+  music_genres: MusicIcon,
+  mythology: SparklesIcon,
+  nature: LeafIcon,
+  school_subjects: BookOpenIcon,
+  science: FlaskIcon,
+  space: RocketIcon,
+  sports: FootballIcon,
+  tech: LaptopIcon,
+  travel: PlaneIcon,
+  cinema: ClapperboardIcon,
 };
 
 const FALLBACK_CATEGORIES = ['general', 'food', 'travel', 'cinema', 'sports', 'tech'];
@@ -291,6 +340,7 @@ export default function CreateRoomScreen() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
             {MODE_OPTIONS.map((mode) => {
               const active = config.mode === mode.value;
+              const IconComponent = mode.Icon;
               return (
                 <button
                   key={mode.value}
@@ -310,23 +360,7 @@ export default function CreateRoomScreen() {
                     boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)',
                   }}
                 >
-                  <div
-                    style={{
-                      width: 34,
-                      height: 34,
-                      borderRadius: 10,
-                      background: active ? '#e8c547' : 'rgba(255,255,255,0.06)',
-                      color: active ? '#000' : '#8c8a85',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontFamily: 'IBM Plex Mono, monospace',
-                      fontSize: 11,
-                      letterSpacing: '0.08em',
-                    }}
-                  >
-                    {mode.badge}
-                  </div>
+                  <IconComponent size={28} color={active ? '#e8c547' : '#8c8a85'} />
                   <div>
                     <p style={{ fontFamily: 'Syne, sans-serif', fontSize: 15, color: '#e3e2e8', margin: '0 0 4px' }}>
                       {mode.label}
@@ -346,6 +380,7 @@ export default function CreateRoomScreen() {
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {categories.map((category) => {
               const active = config.categories.includes(category);
+              const IconComponent = CATEGORY_ICON_MAP[category] || GlobeIcon;
               return (
                 <button
                   key={category}
@@ -365,11 +400,9 @@ export default function CreateRoomScreen() {
                     gap: 8,
                   }}
                 >
-                  <span style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 9, color: active ? '#3ecfb0' : '#4a5068', letterSpacing: '0.08em' }}>
-                    {CATEGORY_ICONS[category] ?? 'CAT'}
-                  </span>
+                  <IconComponent size={18} color={active ? '#3ecfb0' : '#8c8a85'} />
                   <span style={{ fontFamily: 'Syne, sans-serif', fontSize: 13, color: active ? '#e3e2e8' : '#8c8a85' }}>
-                    {category}
+                    {category.replace(/_/g, ' ')}
                   </span>
                 </button>
               );

@@ -28,6 +28,7 @@ import SettingsScreen from './screens/SettingsScreen';
 import OnboardingScreen from './screens/OnboardingScreen';
 import HowToPlayScreen from './screens/HowToPlayScreen';
 import { BottomNav } from './components/BottomNav';
+import PassAndPlayGame from './features/passAndPlay/PassAndPlayGame';
 
 /** Wrapper that renders PassAndPlayScreen with data from the local game store */
 function LocalPassAndPlayRoute() {
@@ -170,6 +171,7 @@ export default function App() {
           <Route path="/leaderboard" element={<LeaderboardScreen />} />
           <Route path="/settings" element={<SettingsScreen />} />
           <Route path="/how-to-play" element={<HowToPlayScreen />} />
+          <Route path="/play/local" element={<PassAndPlayGame />} />
           {/* Placeholder routes for future phases */}
           <Route path="/game/*" element={<div className="min-h-screen bg-background text-white flex items-center justify-center">Coming soon...</div>} />
         </Routes>

@@ -139,13 +139,14 @@ export default function SettingsScreen() {
         textScale,
       };
 
+      const updatedNickname = (result.nickname as string | undefined) ?? nickname.trim();
       setUser({
         ...user,
-        displayName: (result.displayName as string | undefined) ?? nickname.trim(),
-        nickname: (result.nickname as string | undefined) ?? nickname.trim(),
+        displayName: (result.displayName as string | undefined) ?? updatedNickname,
+        nickname: updatedNickname,
         preferences: nextPreferences,
       });
-      socket.emit('profile:update_identity', { displayName: nickname.trim() });
+      socket.emit('profile:update_identity', { nickname: updatedNickname });
       setSaveState('saved');
       setTimeout(() => setSaveState('idle'), 1600);
     } catch (error) {
