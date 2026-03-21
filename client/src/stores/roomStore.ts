@@ -6,6 +6,9 @@ import type { Room, Player, GameConfig } from '../../../shared/types';
 // Derive socket URL: use VITE_SOCKET_URL if set, otherwise same origin
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL ?? '';
 
+console.log('🔌 [SOCKET DEBUG] Initializing socket with URL:', SOCKET_URL);
+console.log('🔌 [SOCKET DEBUG] import.meta.env.VITE_SOCKET_URL:', import.meta.env.VITE_SOCKET_URL);
+
 export const socket = io(SOCKET_URL, {
   withCredentials: true,
   autoConnect: false,
@@ -16,8 +19,17 @@ export const socket = io(SOCKET_URL, {
   timeout: 10000,
 });
 
+socket.on('connect', () => {
+  console.log('✅ [SOCKET DEBUG] Connected to:', SOCKET_URL);
+});
+
+socket.on('connect_error', (err) => {
+  console.error('❌ [SOCKET DEBUG] Connection error:', err.message);
+});
+
 /** Call after a session cookie is established (login / guest auth) */
 export function connectSocket() {
+  console.log('🔌 [SOCKET DEBUG] connectSocket() called, connected:', socket.connected);
   if (!socket.connected) socket.connect();
 }
 

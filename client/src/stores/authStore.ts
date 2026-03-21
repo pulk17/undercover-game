@@ -22,17 +22,28 @@ type AuthStore = AuthState & AuthActions;
 
 const BASE = env.VITE_API_BASE_URL;
 
+console.log('🌐 [AUTH DEBUG] API Base URL:', BASE);
+
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
+  const url = `${BASE}${path}`;
+  console.log('🌐 [AUTH DEBUG] Fetching:', url);
+  
+  const res = await fetch(url, {
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     ...init,
   });
+  
+  console.log('🌐 [AUTH DEBUG] Response status:', res.status, 'for', url);
+  
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error((body as { error?: { message?: string }; message?: string }).error?.message ?? (body as { message?: string }).message ?? `HTTP ${res.status}`);
+    const errorMsg = (body as { error?: { message?: string }; message?: string }).error?.message ?? (body as { message?: string }).message ?? `HTTP ${res.status}`;
+    console.error('❌ [AUTH DEBUG] Request failed:', errorMsg);
+    throw new Error(errorMsg);
   }
   const body = await res.json() as { data: T; error: unknown };
+  console.log('✅ [AUTH DEBUG] Request succeeded for', url);
   return body.data;
 }
 
