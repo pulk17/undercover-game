@@ -74,22 +74,41 @@ export default function App() {
   }, [location.pathname]);
 
   useEffect(() => {
-    // Don't interfere with the new Pass & Play mode at all
-    if (location.pathname.startsWith('/play/local')) return;
+    console.log('[App] Navigation check:', {
+      pathname: location.pathname,
+      isLocalMode,
+      hasHandoffPlayer: !!handoffPlayer,
+      hasCurrentRevealRole: !!currentRevealRole,
+      localGamePhase: localGameState?.phase
+    });
     
-    if (!isLocalMode) return;
+    // Don't interfere with the new Pass & Play mode at all
+    if (location.pathname.startsWith('/play/local')) {
+      console.log('[App] Skipping redirect - Pass & Play mode detected');
+      return;
+    }
+    
+    if (!isLocalMode) {
+      console.log('[App] Not in local mode, skipping');
+      return;
+    }
 
     if (handoffPlayer) {
+      console.log('[App] Redirecting to /game/pass for handoff');
       navigate('/game/pass', { replace: true });
       return;
     }
 
     if (currentRevealRole && localGameState?.phase === 'role_reveal') {
+      console.log('[App] Redirecting to /game/reveal for role reveal');
       navigate('/game/reveal', { replace: true });
       return;
     }
 
-    if (!localGameState) return;
+    if (!localGameState) {
+      console.log('[App] No local game state');
+      return;
+    }
 
     const phaseRouteMap: Record<string, string> = {
       role_reveal: '/game/reveal',
@@ -104,6 +123,7 @@ export default function App() {
 
     const nextRoute = phaseRouteMap[localGameState.phase];
     if (nextRoute && location.pathname !== nextRoute) {
+      console.log('[App] Redirecting to', nextRoute, 'for phase', localGameState.phase);
       navigate(nextRoute, { replace: true });
     }
   }, [currentRevealRole, handoffPlayer, isLocalMode, localGameState, location.pathname, navigate]);

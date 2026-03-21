@@ -115,7 +115,11 @@ export default function SplashScreen({ onDone }: { onDone: () => void }) {
           JOIN ROOM
         </button>
         <button
-          onClick={() => { onDone(); navigate('/play/local'); }}
+          onClick={() => { 
+            console.log('[SplashScreen] PASS & PLAY button clicked - navigating to /play/local');
+            onDone(); 
+            navigate('/play/local'); 
+          }}
           style={{
             width: '100%',
             padding: '12px 16px',

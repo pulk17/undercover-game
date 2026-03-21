@@ -156,7 +156,7 @@ export default function RoomLobbyScreen() {
               </button>
               <button
                 type="button"
-                onClick={handleLocalPlay}
+                onClick={() => navigate('/play/local')}
                 style={{
                   height: 52,
                   borderRadius: 12,
@@ -169,7 +169,7 @@ export default function RoomLobbyScreen() {
                   cursor: 'pointer',
                 }}
               >
-                Local Pass-and-Play
+                PASS & PLAY (OFFLINE)
               </button>
             </motion.div>
           </div>
