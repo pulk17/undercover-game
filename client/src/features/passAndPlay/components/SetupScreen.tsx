@@ -21,6 +21,8 @@ export default function SetupScreen({ onStart }: SetupScreenProps) {
   const [currentName, setCurrentName] = useState('');
   const [nameError, setNameError] = useState('');
   
+  console.log('[SetupScreen] Rendered with', names.length, 'players');
+  
   const [settings, setSettings] = useState<PnPSettings>({
     includeMrWhite: true,
     undercoverCount: 1,
@@ -600,7 +602,10 @@ export default function SetupScreen({ onStart }: SetupScreenProps) {
 
         {/* Start Button */}
         <button
-          onClick={handleStart}
+          onClick={() => {
+            console.log('[SetupScreen] START GAME button clicked, canStart:', canStart, 'loading:', loading);
+            handleStart();
+          }}
           disabled={!canStart || loading}
           style={{
             width: '100%',

@@ -25,6 +25,8 @@ export default function PassAndPlayGame() {
   const [showExitDialog, setShowExitDialog] = useState(false);
   const [resumeDialogShown, setResumeDialogShown] = useState(false);
 
+  console.log('[PassAndPlayGame] Rendered with phase:', phase, 'revealSubPhase:', revealSubPhase);
+
   const privacyGuard = usePrivacyGuard(phase, revealSubPhase);
 
   // Navigation guard
@@ -55,8 +57,10 @@ export default function PassAndPlayGame() {
 
   // Render current phase
   const renderPhase = () => {
+    console.log('[PassAndPlayGame] renderPhase called, phase:', phase);
     switch (phase) {
       case 'SETUP':
+        console.log('[PassAndPlayGame] Rendering SetupScreen');
         return <SetupScreen onStart={initGame} />;
       
       case 'ROLE_REVEAL':
